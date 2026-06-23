@@ -135,10 +135,14 @@ async def chat(request: Request, pbi_session: str = Cookie(default=None)):
 
     df, error = A.ejecutar_dax(dax)
     if error:
+        print(f"[DAX ERROR] {error}", flush=True)
+        print(f"[DAX QUERY] {dax}", flush=True)
         dax2 = A.corregir_dax(text, dax, error, hist_assistant)
         df2, error2 = A.ejecutar_dax(dax2)
         if not error2:
             dax, df, error = dax2, df2, None
+        else:
+            print(f"[DAX ERROR 2] {error2}", flush=True)
 
     # Guardar contexto rico en sesión (igual que Streamlit)
     if not error and not df.empty:
