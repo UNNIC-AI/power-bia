@@ -1,7 +1,7 @@
 FROM python:3.12-slim
 
 # Install .NET 10 runtime via official install script
-RUN apt-get update && apt-get install -y curl && \
+RUN apt-get update && apt-get install -y curl libicu-dev && \
     curl -sSL https://dot.net/v1/dotnet-install.sh -o /tmp/dotnet-install.sh && \
     chmod +x /tmp/dotnet-install.sh && \
     /tmp/dotnet-install.sh --runtime dotnet --channel 10.0 && \
