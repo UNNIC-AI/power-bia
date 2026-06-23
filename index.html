@@ -1,0 +1,1404 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Power BIA — Analítica Conversacional</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Lora:ital,wght@0,400;0,500;1,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --ground:      #0D0D14;
+      --surface:     #13131C;
+      --surface-2:   #1A1A26;
+      --surface-3:   #202030;
+      --border:      #222232;
+      --border-2:    #2C2C40;
+      --text:        #E6E6F0;
+      --text-2:      #8A8AA8;
+      --text-3:      #50506A;
+      --accent:      #7C6FE0;
+      --accent-low:  rgba(124,111,224,0.12);
+      --accent-mid:  rgba(124,111,224,0.22);
+      --amber:       #F0B429;
+      --green:       #34D399;
+      --font-ui:     'Inter', system-ui, sans-serif;
+      --font-prose:  'Lora', Georgia, serif;
+      --font-data:   'JetBrains Mono', 'Courier New', monospace;
+      --r:           10px;
+      --r-sm:        7px;
+      --sidebar-w:   258px;
+    }
+
+    [data-theme="light"] {
+      --ground:    #F4F3FB;
+      --surface:   #FFFFFF;
+      --surface-2: #EEEDF8;
+      --surface-3: #E6E5F4;
+      --border:    #DDDCEB;
+      --border-2:  #CCCBDE;
+      --text:      #1C1C2E;
+      --text-2:    #5A5A78;
+      --text-3:    #9090B0;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; }
+    body {
+      font-family: var(--font-ui);
+      background: var(--ground);
+      color: var(--text);
+      display: flex;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    /* ── Sidebar ─────────────────────────────────── */
+    .sidebar {
+      width: var(--sidebar-w);
+      min-width: var(--sidebar-w);
+      height: 100vh;
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+    }
+
+    .sidebar-head {
+      padding: 18px 18px 14px;
+      border-bottom: 1px solid var(--border);
+    }
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .logo-glyph {
+      width: 32px;
+      height: 32px;
+      background: var(--accent);
+      border-radius: 9px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .logo-glyph svg { display: block; }
+    .logo-wordmark { line-height: 1.2; }
+    .logo-name {
+      font-size: 14.5px;
+      font-weight: 600;
+      color: var(--text);
+      letter-spacing: -0.02em;
+    }
+    .logo-tagline {
+      font-size: 10.5px;
+      color: var(--text-3);
+      font-family: var(--font-data);
+      letter-spacing: 0.02em;
+    }
+
+    .sidebar-actions { padding: 12px 14px 8px; }
+    .btn-new {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      background: var(--accent-low);
+      border: 1px solid rgba(124,111,224,0.35);
+      border-radius: var(--r-sm);
+      color: #A89EF5;
+      font-family: var(--font-ui);
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s;
+      text-align: left;
+    }
+    .btn-new:hover { background: var(--accent-mid); border-color: var(--accent); color: var(--text); }
+
+    .sidebar-scroll {
+      flex: 1;
+      overflow-y: auto;
+      padding: 6px 10px 12px;
+    }
+    .sidebar-scroll::-webkit-scrollbar { width: 3px; }
+    .sidebar-scroll::-webkit-scrollbar-thumb { background: var(--border-2); border-radius: 2px; }
+
+    .hist-group {
+      font-size: 10px;
+      font-family: var(--font-data);
+      text-transform: uppercase;
+      letter-spacing: 0.09em;
+      color: var(--text-3);
+      padding: 10px 6px 4px;
+    }
+    .conv-item {
+      display: flex;
+      align-items: center;
+      border-radius: var(--r-sm);
+      transition: background 0.1s;
+    }
+    .conv-item:hover { background: var(--surface-2); }
+    .conv-item:hover .conv-del { opacity: 1; }
+    .conv-item.active { background: var(--accent-low); }
+    .conv-btn {
+      flex: 1;
+      min-width: 0;
+      padding: 7px 4px 7px 10px;
+      font-size: 12.5px;
+      color: var(--text-2);
+      background: transparent;
+      border: none;
+      font-family: var(--font-ui);
+      cursor: pointer;
+      text-align: left;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      transition: color 0.1s;
+    }
+    .conv-item:hover .conv-btn,
+    .conv-item.active .conv-btn { color: var(--text); }
+    .conv-del {
+      opacity: 0;
+      flex-shrink: 0;
+      padding: 4px 7px 4px 4px;
+      background: none;
+      border: none;
+      color: var(--text-3);
+      display: flex;
+      align-items: center;
+      transition: opacity 0.1s, color 0.1s;
+    }
+    .conv-del:hover { color: #ef4444; }
+
+    /* ── Main ───────────────────────────────────── */
+    .main {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+    }
+
+    .chat-bar {
+      padding: 0 24px;
+      height: 56px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-shrink: 0;
+    }
+    .status-pip {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--green);
+      flex-shrink: 0;
+    }
+    .status-pip.dim { background: var(--text-3); }
+    .chat-bar-title {
+      font-size: 13.5px;
+      font-weight: 500;
+      color: var(--text);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .chat-bar-title.empty { color: var(--text-3); font-weight: 400; font-style: italic; }
+
+    .messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 28px 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 22px;
+    }
+    .messages::-webkit-scrollbar { width: 4px; }
+    .messages::-webkit-scrollbar-thumb { background: var(--border-2); border-radius: 2px; }
+
+    /* ── Empty state ─────────────────────────────── */
+    .empty {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 20px;
+      padding: 40px 20px;
+      text-align: center;
+    }
+    .empty-badge {
+      width: 52px;
+      height: 52px;
+      background: var(--surface-2);
+      border: 1px solid var(--border-2);
+      border-radius: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .empty-title {
+      font-family: var(--font-prose);
+      font-size: 22px;
+      font-weight: 500;
+      color: var(--text);
+      line-height: 1.3;
+    }
+    .empty-body {
+      font-family: var(--font-prose);
+      font-size: 14px;
+      font-style: italic;
+      color: var(--text-2);
+      line-height: 1.7;
+      max-width: 380px;
+    }
+    .starter-list {
+      display: flex;
+      flex-direction: column;
+      gap: 7px;
+      width: 100%;
+      max-width: 440px;
+      margin-top: 4px;
+    }
+    .starter {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 11px 14px;
+      background: var(--surface-2);
+      border: 1px solid var(--border-2);
+      border-radius: var(--r-sm);
+      color: var(--text-2);
+      font-size: 13px;
+      font-family: var(--font-ui);
+      cursor: pointer;
+      text-align: left;
+      transition: border-color 0.15s, color 0.15s, background 0.15s;
+    }
+    .starter:hover { border-color: rgba(124,111,224,0.5); color: var(--text); background: var(--surface-3); }
+    .starter-icon { font-size: 14px; flex-shrink: 0; line-height: 1; }
+
+    /* ── Messages ───────────────────────────────── */
+    .msg { display: flex; flex-direction: column; }
+    .msg-bot  { align-self: flex-start; max-width: min(800px, 100%); }
+    .msg-user { align-self: flex-end;   max-width: 62%; }
+
+    .bubble {
+      padding: 12px 16px;
+      line-height: 1.65;
+      font-size: 14px;
+    }
+    .msg-bot .bubble {
+      background: var(--surface);
+      border: 1px solid var(--border-2);
+      border-radius: 3px var(--r) var(--r) var(--r);
+      font-family: var(--font-prose);
+      font-size: 14.5px;
+      color: var(--text);
+    }
+    .msg-user .bubble {
+      background: var(--surface-2);
+      border: 1px solid rgba(124,111,224,0.28);
+      border-radius: var(--r) 3px var(--r) var(--r);
+      font-family: var(--font-ui);
+      color: var(--text);
+    }
+
+    .msg-time {
+      font-size: 10.5px;
+      font-family: var(--font-data);
+      color: var(--text-3);
+      margin-top: 5px;
+      padding: 0 2px;
+    }
+    .msg-bot .msg-time  { align-self: flex-start; }
+    .msg-user .msg-time { align-self: flex-end; }
+
+    /* ── Cards ──────────────────────────────────── */
+    .card {
+      margin-top: 10px;
+      background: var(--surface-2);
+      border: 1px solid var(--border-2);
+      border-radius: var(--r);
+      overflow: hidden;
+    }
+    .card-head {
+      padding: 10px 14px 9px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: baseline;
+      gap: 9px;
+    }
+    .card-kind {
+      font-family: var(--font-data);
+      font-size: 9px;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--accent);
+      background: var(--accent-low);
+      padding: 2px 7px;
+      border-radius: 4px;
+      flex-shrink: 0;
+    }
+    .card-title { font-size: 13px; font-weight: 500; color: var(--text); }
+    .card-sub   { font-size: 12px; color: var(--text-3); }
+    .card-body  { padding: 14px 16px; }
+
+    /* KPI */
+    .kpi-num {
+      font-family: var(--font-data);
+      font-size: 44px;
+      font-weight: 400;
+      color: var(--text);
+      letter-spacing: -0.04em;
+      line-height: 1;
+    }
+    .kpi-label {
+      margin-top: 7px;
+      font-size: 12px;
+      color: var(--text-2);
+    }
+
+    /* Table */
+    .tbl-wrap {
+      overflow-x: auto;
+      max-height: 300px;
+      overflow-y: auto;
+    }
+    .tbl-wrap::-webkit-scrollbar { height: 3px; width: 3px; }
+    .tbl-wrap::-webkit-scrollbar-thumb { background: var(--border-2); border-radius: 2px; }
+
+    table.dt {
+      width: 100%;
+      border-collapse: collapse;
+      font-family: var(--font-data);
+      font-size: 11.5px;
+    }
+    table.dt th {
+      position: sticky;
+      top: 0;
+      background: var(--surface-2);
+      color: var(--text-3);
+      font-size: 9.5px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      font-weight: 500;
+      padding: 7px 12px;
+      text-align: left;
+      border-bottom: 1px solid var(--border-2);
+      white-space: nowrap;
+    }
+    table.dt td {
+      padding: 6px 12px;
+      color: var(--text-2);
+      border-bottom: 1px solid var(--border);
+      white-space: nowrap;
+    }
+    table.dt tr:last-child td { border-bottom: none; }
+    table.dt tbody tr:hover td { background: rgba(255,255,255,0.025); color: var(--text); }
+
+    /* Charts */
+    .chart-svg { width: 100%; height: auto; display: block; }
+
+    /* Followups */
+    .followups { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 10px; }
+    .fu-btn {
+      padding: 5px 12px;
+      border: 1px solid var(--border-2);
+      border-radius: 20px;
+      background: transparent;
+      color: var(--text-2);
+      font-size: 12px;
+      font-family: var(--font-ui);
+      cursor: pointer;
+      transition: border-color 0.15s, color 0.15s, background 0.15s;
+    }
+    .fu-btn:hover { border-color: var(--accent); color: var(--text); background: var(--accent-low); }
+
+    /* Typing */
+    .typing-wrap { display: flex; align-items: center; gap: 5px; padding: 12px 16px; }
+    .t-dot {
+      width: 5px; height: 5px;
+      border-radius: 50%;
+      background: var(--text-3);
+      animation: tdot 1.1s ease-in-out infinite;
+    }
+    .t-dot:nth-child(2) { animation-delay: 0.18s; }
+    .t-dot:nth-child(3) { animation-delay: 0.36s; }
+    @keyframes tdot {
+      0%, 60%, 100% { transform: translateY(0);    opacity: 0.35; }
+      30%            { transform: translateY(-5px); opacity: 1; }
+    }
+
+    /* ── Input ──────────────────────────────────── */
+    .input-area {
+      padding: 14px 24px 18px;
+      border-top: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .input-box {
+      display: flex;
+      align-items: flex-end;
+      gap: 9px;
+      background: var(--surface-2);
+      border: 1px solid var(--border-2);
+      border-radius: var(--r);
+      padding: 9px 10px;
+      transition: border-color 0.15s;
+    }
+    .input-box:focus-within { border-color: rgba(124,111,224,0.5); }
+    .input-ta {
+      flex: 1;
+      background: transparent;
+      border: none;
+      outline: none;
+      color: var(--text);
+      font-family: var(--font-ui);
+      font-size: 13.5px;
+      line-height: 1.5;
+      resize: none;
+      min-height: 22px;
+      max-height: 110px;
+    }
+    .input-ta::placeholder { color: var(--text-3); }
+    .send {
+      width: 30px;
+      height: 30px;
+      border-radius: 7px;
+      background: var(--accent);
+      border: none;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      transition: opacity 0.15s;
+    }
+    .send:hover { opacity: 0.82; }
+    .send:disabled { opacity: 0.28; cursor: default; }
+    .input-hint {
+      margin-top: 6px;
+      font-size: 10.5px;
+      color: var(--text-3);
+      font-family: var(--font-data);
+      text-align: center;
+    }
+
+    /* ── Sidebar footer (user + theme toggle) ──── */
+    .sidebar-foot {
+      padding: 10px 14px 14px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 9px;
+    }
+    .user-avatar {
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      background: var(--accent);
+      color: #fff;
+      font-size: 12px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      letter-spacing: 0;
+    }
+    .user-info { flex: 1; min-width: 0; }
+    .user-name {
+      font-size: 12.5px;
+      font-weight: 500;
+      color: var(--text);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .user-email {
+      font-size: 10.5px;
+      color: var(--text-3);
+      font-family: var(--font-data);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .theme-btn {
+      width: 28px;
+      height: 28px;
+      border-radius: 7px;
+      background: var(--surface-2);
+      border: 1px solid var(--border-2);
+      color: var(--text-2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      transition: background 0.15s, color 0.15s;
+    }
+    .theme-btn:hover { background: var(--surface-3); color: var(--text); }
+    .theme-btn svg { display: block; }
+
+    /* light-mode adjustments */
+    [data-theme="light"] .msg-bot .bubble {
+      background: #FFFFFF;
+      border-color: var(--border-2);
+    }
+    [data-theme="light"] table.dt th { background: var(--surface-2); }
+
+    /* ── Misc ───────────────────────────────────── */
+    @media (prefers-reduced-motion: reduce) {
+      .t-dot { animation: none; opacity: 0.5; }
+    }
+    @media (max-width: 600px) {
+      .sidebar { display: none; }
+      .messages { padding: 16px; }
+      .msg-user { max-width: 80%; }
+    }
+
+    button { cursor: pointer; }
+    button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+    /* ── Profile popover ────────────────────────── */
+    .profile-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 100;
+      background: transparent;
+    }
+    .profile-pop {
+      position: fixed;
+      bottom: 70px;
+      left: 14px;
+      width: calc(var(--sidebar-w) - 28px);
+      background: var(--surface);
+      border: 1px solid var(--border-2);
+      border-radius: var(--r);
+      box-shadow: 0 8px 32px rgba(0,0,0,0.35);
+      z-index: 101;
+      overflow: hidden;
+      animation: pop-in 0.14s ease;
+    }
+    @keyframes pop-in {
+      from { opacity: 0; transform: translateY(6px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .pop-head {
+      padding: 16px 16px 12px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      border-bottom: 1px solid var(--border);
+    }
+    .pop-avatar {
+      width: 46px;
+      height: 46px;
+      border-radius: 50%;
+      background: var(--accent);
+      color: #fff;
+      font-size: 17px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .pop-name-wrap {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .pop-name-display {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text);
+    }
+    .pop-edit-btn {
+      background: none;
+      border: none;
+      color: var(--text-3);
+      padding: 2px;
+      display: flex;
+      align-items: center;
+      transition: color 0.1s;
+    }
+    .pop-edit-btn:hover { color: var(--accent); }
+    .pop-name-input {
+      font-size: 13.5px;
+      font-family: var(--font-ui);
+      font-weight: 600;
+      color: var(--text);
+      background: var(--surface-2);
+      border: 1px solid var(--accent);
+      border-radius: 5px;
+      padding: 4px 8px;
+      outline: none;
+      width: 100%;
+      display: none;
+    }
+    .pop-email {
+      font-size: 11.5px;
+      color: var(--text-3);
+      font-family: var(--font-data);
+    }
+    .pop-actions { padding: 6px; }
+    .pop-action {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      padding: 8px 10px;
+      border-radius: var(--r-sm);
+      background: transparent;
+      border: none;
+      color: var(--text-2);
+      font-size: 13px;
+      font-family: var(--font-ui);
+      text-align: left;
+      transition: background 0.12s, color 0.12s;
+    }
+    .pop-action:hover { background: var(--surface-2); color: var(--text); }
+    .pop-action.danger:hover { background: rgba(239,68,68,0.1); color: #ef4444; }
+    .pop-action svg { flex-shrink: 0; }
+  </style>
+</head>
+<body>
+
+<aside class="sidebar">
+  <div class="sidebar-head">
+    <div class="logo">
+      <div class="logo-glyph">
+        <svg width="17" height="17" viewBox="0 0 17 17" fill="none">
+          <rect x="1"   y="9"  width="3" height="7" rx="1.2" fill="white" opacity="0.6"/>
+          <rect x="5.5" y="5.5" width="3" height="10.5" rx="1.2" fill="white" opacity="0.78"/>
+          <rect x="10"  y="2"  width="3" height="14" rx="1.2" fill="white"/>
+          <path d="M2.5 10 L7 7 L11.5 3.5" stroke="white" stroke-width="1.15" stroke-linecap="round" opacity="0.45"/>
+        </svg>
+      </div>
+      <div class="logo-wordmark">
+        <div class="logo-name">Power BIA</div>
+        <div class="logo-tagline">Analítica · Chat</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="sidebar-actions">
+    <button class="btn-new" onclick="newConversation()">
+      <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><line x1="6" y1="1" x2="6" y2="11"/><line x1="1" y1="6" x2="11" y2="6"/></svg>
+      Nueva consulta
+    </button>
+  </div>
+
+  <div class="sidebar-scroll" id="sidebar-list"></div>
+
+  <div class="sidebar-foot">
+    <div class="user-avatar" id="user-avatar" onclick="openProfile()" style="cursor:pointer">MT</div>
+    <div class="user-info" onclick="openProfile()" style="cursor:pointer">
+      <div class="user-name" id="user-name">Marc Torrents</div>
+      <div class="user-email" id="user-email">marc.torrents@powerbi.ai</div>
+    </div>
+    <button class="theme-btn" id="theme-btn" onclick="toggleTheme()" title="Cambiar tema">
+      <svg id="theme-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="5"/>
+        <line x1="12" y1="1" x2="12" y2="3"/>
+        <line x1="12" y1="21" x2="12" y2="23"/>
+        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
+        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+        <line x1="1" y1="12" x2="3" y2="12"/>
+        <line x1="21" y1="12" x2="23" y2="12"/>
+        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
+        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+      </svg>
+    </button>
+  </div>
+</aside>
+
+<main class="main">
+  <div class="chat-bar">
+    <div class="status-pip dim" id="status-pip"></div>
+    <span class="chat-bar-title empty" id="bar-title">Selecciona o inicia una consulta</span>
+  </div>
+
+  <div class="messages" id="messages">
+    <div class="empty" id="empty-state">
+      <div class="empty-badge">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#7C6FE0" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+        </svg>
+      </div>
+      <div>
+        <div class="empty-title">Pregunta sobre tus datos</div>
+        <div class="empty-body">Formula cualquier pregunta sobre tu modelo Power BI. Obtendrás una respuesta en lenguaje natural acompañada de gráficos, tablas o métricas clave según el tipo de datos.</div>
+      </div>
+      <div class="starter-list">
+        <button class="starter" onclick="useSuggestion('¿Cuáles fueron las ventas totales en 2021?')">
+          <span class="starter-icon">📊</span>¿Cuáles fueron las ventas totales en 2021?
+        </button>
+        <button class="starter" onclick="useSuggestion('Muéstrame la evolución de ventas de 2012 a 2021')">
+          <span class="starter-icon">📈</span>Muéstrame la evolución de ventas de 2012 a 2021
+        </button>
+        <button class="starter" onclick="useSuggestion('¿Qué productos tuvieron mayor margen en 2019?')">
+          <span class="starter-icon">🔍</span>¿Qué productos tuvieron mayor margen en 2019?
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="input-area">
+    <div class="input-box">
+      <textarea
+        class="input-ta"
+        id="input"
+        placeholder="Pregunta sobre tus datos de Power BI…"
+        rows="1"
+        onkeydown="onKey(event)"
+        oninput="grow(this)"
+      ></textarea>
+      <button class="send" id="send" onclick="submit()" title="Enviar (Enter)">
+        <svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="white" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="6.5" y1="11.5" x2="6.5" y2="1.5"/>
+          <polyline points="2.5 5.5 6.5 1.5 10.5 5.5"/>
+        </svg>
+      </button>
+    </div>
+    <div class="input-hint">Enter para enviar · Shift+Enter nueva línea</div>
+  </div>
+</main>
+
+<script>
+const API = '/api/chat';
+const COLORS = ['#7C6FE0','#60A5FA','#34D399','#F0B429','#F472B6','#A78BFA','#FB923C','#38BDF8'];
+
+// ── State ──────────────────────────────────────────────────────────────────
+let convs = [];
+let activeId = null;
+
+try { convs = JSON.parse(localStorage.getItem('pbia_convs') || '[]'); } catch(e) {}
+
+// ── Theme ──────────────────────────────────────────────────────────────────
+const MOON_ICON = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>`;
+const SUN_ICON  = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>`;
+
+function toggleTheme() {
+  const isLight = document.documentElement.getAttribute('data-theme') === 'light';
+  applyTheme(isLight ? 'dark' : 'light');
+}
+
+function applyTheme(theme) {
+  localStorage.setItem('pbia_theme', theme);
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+    document.getElementById('theme-btn').innerHTML = MOON_ICON;
+    document.getElementById('theme-btn').title = 'Cambiar a modo oscuro';
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+    document.getElementById('theme-btn').innerHTML = SUN_ICON;
+    document.getElementById('theme-btn').title = 'Cambiar a modo claro';
+  }
+}
+
+// ── Boot ───────────────────────────────────────────────────────────────────
+(function init() {
+  const saved = localStorage.getItem('pbia_theme')
+    || (window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+  applyTheme(saved);
+
+  const savedName = localStorage.getItem('pbia_user_name');
+  if (savedName) {
+    document.getElementById('user-name').textContent = savedName;
+    document.getElementById('user-avatar').textContent =
+      savedName.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+  }
+
+  paintSidebar();
+  if (convs.length) loadConv(convs[0].id);
+})();
+
+// ── Conversations ──────────────────────────────────────────────────────────
+function newConversation() {
+  const id = 'c' + Date.now();
+  convs.unshift({ id, title: 'Nueva consulta', msgs: [], ts: Date.now() });
+  persist();
+  loadConv(id);
+}
+
+function loadConv(id) {
+  activeId = id;
+  const c = convs.find(x => x.id === id);
+  if (!c) return;
+
+  const title = document.getElementById('bar-title');
+  title.textContent = c.title;
+  title.className = 'chat-bar-title';
+
+  document.getElementById('status-pip').className = 'status-pip';
+
+  const box = document.getElementById('messages');
+  box.innerHTML = '';
+
+  if (!c.msgs.length) {
+    box.appendChild(mkEmpty());
+  } else {
+    c.msgs.forEach(m => box.appendChild(mkMsg(m)));
+    scrollEnd();
+  }
+
+  paintSidebar();
+}
+
+function persist() {
+  try {
+    localStorage.setItem('pbia_convs', JSON.stringify(
+      convs.map(c => ({ ...c, msgs: c.msgs.slice(-50) }))
+    ));
+  } catch(e) {}
+}
+
+function active() { return convs.find(c => c.id === activeId) || null; }
+
+function push(msg) {
+  const c = active();
+  if (!c) return;
+  c.msgs.push(msg);
+  if (msg.role === 'user' && c.title === 'Nueva consulta') {
+    c.title = msg.text.slice(0, 48) + (msg.text.length > 48 ? '…' : '');
+    document.getElementById('bar-title').textContent = c.title;
+    paintSidebar();
+  }
+  persist();
+}
+
+// ── Sidebar ────────────────────────────────────────────────────────────────
+function paintSidebar() {
+  const el = document.getElementById('sidebar-list');
+  el.innerHTML = '';
+
+  if (!convs.length) {
+    el.innerHTML = '<div style="padding:12px 6px;font-size:12px;color:var(--text-3);">Sin conversaciones</div>';
+    return;
+  }
+
+  const today = new Date().toDateString();
+  const groups = new Map();
+  convs.forEach(c => {
+    const d = new Date(c.ts).toDateString();
+    const lbl = d === today ? 'Hoy' : fmtDay(new Date(c.ts));
+    if (!groups.has(lbl)) groups.set(lbl, []);
+    groups.get(lbl).push(c);
+  });
+
+  groups.forEach((cs, lbl) => {
+    const g = document.createElement('div');
+    g.className = 'hist-group';
+    g.textContent = lbl;
+    el.appendChild(g);
+    cs.forEach(c => {
+      const item = document.createElement('div');
+      item.className = 'conv-item' + (c.id === activeId ? ' active' : '');
+
+      const b = document.createElement('button');
+      b.className = 'conv-btn';
+      b.textContent = c.title;
+      b.onclick = () => loadConv(c.id);
+
+      const del = document.createElement('button');
+      del.className = 'conv-del';
+      del.title = 'Eliminar conversación';
+      del.innerHTML = `<svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><line x1="2" y1="2" x2="10" y2="10"/><line x1="10" y1="2" x2="2" y2="10"/></svg>`;
+      del.onclick = e => { e.stopPropagation(); deleteConv(c.id); };
+
+      item.appendChild(b);
+      item.appendChild(del);
+      el.appendChild(item);
+    });
+  });
+}
+
+function deleteConv(id) {
+  convs = convs.filter(c => c.id !== id);
+  persist();
+  if (activeId === id) {
+    activeId = null;
+    if (convs.length) {
+      loadConv(convs[0].id);
+    } else {
+      document.getElementById('bar-title').textContent = 'Selecciona o inicia una consulta';
+      document.getElementById('bar-title').className = 'chat-bar-title empty';
+      document.getElementById('status-pip').className = 'status-pip dim';
+      const box = document.getElementById('messages');
+      box.innerHTML = '';
+      box.appendChild(mkEmpty());
+      paintSidebar();
+    }
+  } else {
+    paintSidebar();
+  }
+}
+
+function fmtDay(d) {
+  return d.toLocaleDateString('es-ES', { weekday:'short', day:'numeric', month:'short' });
+}
+
+// ── Message elements ───────────────────────────────────────────────────────
+function mkEmpty() {
+  const div = document.createElement('div');
+  div.className = 'empty';
+  div.id = 'empty-state';
+  div.innerHTML = `
+    <div class="empty-badge">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#7C6FE0" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+      </svg>
+    </div>
+    <div>
+      <div class="empty-title">Pregunta sobre tus datos</div>
+      <div class="empty-body">Formula cualquier pregunta sobre tu modelo Power BI. Obtendrás una respuesta en lenguaje natural acompañada de gráficos, tablas o métricas clave.</div>
+    </div>
+    <div class="starter-list">
+      <button class="starter" onclick="useSuggestion('¿Cuáles fueron las ventas totales en 2021?')">
+        <span class="starter-icon">📊</span>¿Cuáles fueron las ventas totales en 2021?
+      </button>
+      <button class="starter" onclick="useSuggestion('Muéstrame la evolución de ventas de 2012 a 2021')">
+        <span class="starter-icon">📈</span>Muéstrame la evolución de ventas de 2012 a 2021
+      </button>
+      <button class="starter" onclick="useSuggestion('¿Qué productos tuvieron mayor margen en 2019?')">
+        <span class="starter-icon">🔍</span>¿Qué productos tuvieron mayor margen en 2019?
+      </button>
+    </div>`;
+  return div;
+}
+
+function mkMsg(m) {
+  const wrap = document.createElement('div');
+  wrap.className = 'msg msg-' + m.role;
+
+  const bub = document.createElement('div');
+  bub.className = 'bubble';
+  bub.textContent = m.text;
+  wrap.appendChild(bub);
+
+  if (m.card) wrap.appendChild(mkCard(m.card));
+
+  if (m.followups && m.followups.length) {
+    const fu = document.createElement('div');
+    fu.className = 'followups';
+    m.followups.forEach(f => {
+      const btn = document.createElement('button');
+      btn.className = 'fu-btn';
+      btn.textContent = f.label;
+      btn.onclick = () => useSuggestion(f.text);
+      fu.appendChild(btn);
+    });
+    wrap.appendChild(fu);
+  }
+
+  const ts = document.createElement('div');
+  ts.className = 'msg-time';
+  ts.textContent = fmtTime(m.ts || Date.now());
+  wrap.appendChild(ts);
+
+  return wrap;
+}
+
+function mkTyping() {
+  const wrap = document.createElement('div');
+  wrap.className = 'msg msg-bot';
+  wrap.id = 'typing';
+  const bub = document.createElement('div');
+  bub.className = 'bubble';
+  bub.innerHTML = '<div class="typing-wrap"><div class="t-dot"></div><div class="t-dot"></div><div class="t-dot"></div></div>';
+  wrap.appendChild(bub);
+  return wrap;
+}
+
+// ── Cards ──────────────────────────────────────────────────────────────────
+function mkCard(card) {
+  const kinds = { kpi: 'KPI', bar: 'Barras', line: 'Línea', table: 'Tabla' };
+  const el = document.createElement('div');
+  el.className = 'card';
+
+  const head = document.createElement('div');
+  head.className = 'card-head';
+  head.innerHTML =
+    `<span class="card-kind">${kinds[card.kind] || card.kind}</span>` +
+    (card.title ? `<span class="card-title">${xe(card.title)}</span>` : '') +
+    (card.sub   ? `<span class="card-sub">${xe(card.sub)}</span>` : '');
+  el.appendChild(head);
+
+  const body = document.createElement('div');
+  body.className = 'card-body';
+
+  switch (card.kind) {
+    case 'kpi':   body.appendChild(mkKPI(card));       break;
+    case 'bar':   body.appendChild(mkBarChart(card));  break;
+    case 'line':  body.appendChild(mkLineChart(card)); break;
+    case 'table': body.appendChild(mkTable(card));     break;
+  }
+
+  el.appendChild(body);
+  return el;
+}
+
+function mkKPI(card) {
+  const d = document.createElement('div');
+  const v = card.data && card.data[0] ? card.data[0].value : null;
+  d.innerHTML =
+    `<div class="kpi-num">${v !== null ? fmtNum(v) : '—'}</div>` +
+    `<div class="kpi-label">${xe(card.title || '')}</div>`;
+  return d;
+}
+
+function mkTable(card) {
+  const wrap = document.createElement('div');
+  wrap.className = 'tbl-wrap';
+  const tbl = document.createElement('table');
+  tbl.className = 'dt';
+
+  const thead = tbl.createTHead();
+  const hr = thead.insertRow();
+  (card.cols || []).forEach(col => {
+    const th = document.createElement('th');
+    th.textContent = col;
+    hr.appendChild(th);
+  });
+
+  const tbody = tbl.createTBody();
+  (card.rows || []).forEach(row => {
+    const tr = tbody.insertRow();
+    row.forEach(cell => {
+      const td = tr.insertCell();
+      td.textContent = cell;
+    });
+  });
+
+  wrap.appendChild(tbl);
+  return wrap;
+}
+
+function mkBarChart(card) {
+  const data = (card.data || []).slice(0, 16);
+  if (!data.length) return document.createElement('div');
+
+  const W = 560, H = 270;
+  const pL = 58, pR = 18, pT = 18, pB = 48;
+  const pW = W - pL - pR, pH = H - pT - pB;
+  const max = Math.max(...data.map(d => d.value)) * 1.15 || 1;
+  const n = data.length;
+  const step = pW / n;
+  const bw = Math.min(46, step * 0.56);
+
+  const ns = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(ns, 'svg');
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  svg.setAttribute('class', 'chart-svg');
+
+  for (let i = 0; i <= 4; i++) {
+    const val = max * i / 4;
+    const y = pT + pH - (val / max) * pH;
+    const ln = document.createElementNS(ns, 'line');
+    setA(ln, { x1: pL, y1: y, x2: W - pR, y2: y, stroke: i === 0 ? '#2C2C40' : '#1A1A26', 'stroke-width': 1 });
+    svg.appendChild(ln);
+    const tx = document.createElementNS(ns, 'text');
+    setA(tx, { x: pL - 7, y: y + 4, 'text-anchor': 'end', 'font-size': 10.5, 'font-family': 'JetBrains Mono,monospace', fill: '#50506A' });
+    tx.textContent = fmtNum(Math.round(val));
+    svg.appendChild(tx);
+  }
+
+  data.forEach((d, i) => {
+    const cx = pL + step * i + step / 2;
+    const bh = Math.max(2, (d.value / max) * pH);
+    const y = pT + pH - bh;
+    const col = COLORS[i % COLORS.length];
+
+    const rect = document.createElementNS(ns, 'rect');
+    setA(rect, { x: cx - bw / 2, y, width: bw, height: bh, rx: 4, fill: col, opacity: 0.88 });
+    svg.appendChild(rect);
+
+    if (n <= 10) {
+      const vt = document.createElementNS(ns, 'text');
+      setA(vt, { x: cx, y: y - 5, 'text-anchor': 'middle', 'font-size': 10, 'font-weight': 600, 'font-family': 'JetBrains Mono,monospace', fill: '#8A8AA8' });
+      vt.textContent = fmtNum(d.value);
+      svg.appendChild(vt);
+    }
+
+    const xl = document.createElementNS(ns, 'text');
+    setA(xl, { x: cx, y: H - pB + 16, 'text-anchor': 'middle', 'font-size': 10, 'font-family': 'JetBrains Mono,monospace', fill: '#50506A' });
+    const lbl = String(d.label);
+    xl.textContent = lbl.length > 9 ? lbl.slice(0, 8) + '…' : lbl;
+    svg.appendChild(xl);
+  });
+
+  return svg;
+}
+
+function mkLineChart(card) {
+  const data = (card.data || []).slice(0, 36);
+  if (!data.length) return document.createElement('div');
+
+  const W = 560, H = 260;
+  const pL = 58, pR = 18, pT = 18, pB = 42;
+  const pW = W - pL - pR, pH = H - pT - pB;
+  const vals = data.map(d => d.value);
+  const max = Math.max(...vals) * 1.12 || 1;
+  const min = Math.min(...vals, 0) * 0.9;
+  const rng = (max - min) || 1;
+  const n = data.length;
+  const X = i => pL + pW * (n === 1 ? 0.5 : i / (n - 1));
+  const Y = v => pT + pH - ((v - min) / rng) * pH;
+
+  const ns = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(ns, 'svg');
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  svg.setAttribute('class', 'chart-svg');
+
+  const gid = 'g' + Math.random().toString(36).slice(2, 8);
+  const defs = document.createElementNS(ns, 'defs');
+  const grad = document.createElementNS(ns, 'linearGradient');
+  setA(grad, { id: gid, x1: 0, y1: 0, x2: 0, y2: 1 });
+  const s1 = document.createElementNS(ns, 'stop');
+  setA(s1, { offset: '0%', 'stop-color': '#7C6FE0', 'stop-opacity': 0.22 });
+  const s2 = document.createElementNS(ns, 'stop');
+  setA(s2, { offset: '100%', 'stop-color': '#7C6FE0', 'stop-opacity': 0 });
+  grad.appendChild(s1); grad.appendChild(s2);
+  defs.appendChild(grad);
+  svg.appendChild(defs);
+
+  for (let i = 0; i <= 4; i++) {
+    const val = min + rng * i / 4;
+    const y = Y(val);
+    const ln = document.createElementNS(ns, 'line');
+    setA(ln, { x1: pL, y1: y, x2: W - pR, y2: y, stroke: i === 0 ? '#2C2C40' : '#1A1A26', 'stroke-width': 1 });
+    svg.appendChild(ln);
+    const tx = document.createElementNS(ns, 'text');
+    setA(tx, { x: pL - 7, y: y + 4, 'text-anchor': 'end', 'font-size': 10.5, 'font-family': 'JetBrains Mono,monospace', fill: '#50506A' });
+    tx.textContent = fmtNum(Math.round(val));
+    svg.appendChild(tx);
+  }
+
+  let dL = '';
+  data.forEach((d, i) => { dL += (i ? 'L' : 'M') + X(i) + ' ' + Y(d.value) + ' '; });
+  const dA = dL + `L${X(n-1)} ${pT + pH} L${X(0)} ${pT + pH} Z`;
+
+  const area = document.createElementNS(ns, 'path');
+  setA(area, { d: dA, fill: `url(#${gid})` });
+  svg.appendChild(area);
+
+  const line = document.createElementNS(ns, 'path');
+  setA(line, { d: dL, fill: 'none', stroke: '#7C6FE0', 'stroke-width': 2.4, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' });
+  svg.appendChild(line);
+
+  const every = Math.ceil(n / 8);
+  data.forEach((d, i) => {
+    const x = X(i), y = Y(d.value);
+    const dot = document.createElementNS(ns, 'circle');
+    setA(dot, { cx: x, cy: y, r: 3.2, fill: '#1A1A26', stroke: '#7C6FE0', 'stroke-width': 1.8 });
+    svg.appendChild(dot);
+
+    if (i % every === 0 || i === n - 1) {
+      const tx = document.createElementNS(ns, 'text');
+      setA(tx, { x, y: H - pB + 16, 'text-anchor': 'middle', 'font-size': 10, 'font-family': 'JetBrains Mono,monospace', fill: '#50506A' });
+      const l = String(d.label);
+      tx.textContent = l.length > 8 ? l.slice(0, 7) + '…' : l;
+      svg.appendChild(tx);
+    }
+  });
+
+  return svg;
+}
+
+function setA(el, attrs) {
+  Object.entries(attrs).forEach(([k, v]) => el.setAttribute(k, v));
+}
+
+// ── Send / receive ─────────────────────────────────────────────────────────
+async function submit() {
+  const inp = document.getElementById('input');
+  const text = inp.value.trim();
+  if (!text) return;
+
+  if (!activeId) newConversation();
+
+  inp.value = '';
+  grow(inp);
+  lock(true);
+
+  const es = document.getElementById('empty-state');
+  if (es) es.remove();
+
+  const userMsg = { role: 'user', text, ts: Date.now() };
+  push(userMsg);
+  const box = document.getElementById('messages');
+  box.appendChild(mkMsg(userMsg));
+
+  const typing = mkTyping();
+  box.appendChild(typing);
+  scrollEnd();
+
+  const c = active();
+  const history = c ? c.msgs.slice(0, -1) : [];
+
+  try {
+    const r = await fetch(API, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text, history })
+    });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const d = await r.json();
+
+    typing.remove();
+
+    const botMsg = { role: 'bot', text: d.text || '—', card: d.card || null, followups: d.followups || [], ts: Date.now() };
+    push(botMsg);
+    box.appendChild(mkMsg(botMsg));
+    scrollEnd();
+  } catch(e) {
+    typing.remove();
+    const errMsg = { role: 'bot', text: 'No se pudo conectar con el servidor. Asegúrate de que el backend esté activo.', card: null, followups: [], ts: Date.now() };
+    push(errMsg);
+    box.appendChild(mkMsg(errMsg));
+    scrollEnd();
+  }
+
+  lock(false);
+}
+
+function useSuggestion(text) {
+  document.getElementById('input').value = text;
+  submit();
+}
+
+// ── Utils ──────────────────────────────────────────────────────────────────
+function lock(on) {
+  document.getElementById('send').disabled = on;
+  document.getElementById('input').disabled = on;
+}
+
+function scrollEnd() {
+  const b = document.getElementById('messages');
+  b.scrollTop = b.scrollHeight;
+}
+
+function onKey(e) {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submit(); }
+}
+
+function grow(el) {
+  el.style.height = 'auto';
+  el.style.height = Math.min(el.scrollHeight, 110) + 'px';
+}
+
+function fmtNum(v) {
+  if (typeof v !== 'number') return String(v);
+  if (Math.abs(v) >= 1e6) return (v / 1e6).toFixed(1).replace('.0', '') + 'M';
+  if (Math.abs(v) >= 1e3) return v.toLocaleString('es-ES', { maximumFractionDigits: 0 });
+  if (Number.isInteger(v)) return v.toString();
+  return v.toFixed(2);
+}
+
+function fmtTime(ts) {
+  return new Date(ts).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+}
+
+function xe(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── Profile popover ───────────────────────────────────────────────────────
+let _profileOpen = false;
+
+function openProfile() {
+  if (_profileOpen) { closeProfile(); return; }
+  _profileOpen = true;
+
+  const name  = document.getElementById('user-name').textContent;
+  const email = document.getElementById('user-email').textContent;
+  const initials = name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+
+  const overlay = document.createElement('div');
+  overlay.className = 'profile-overlay';
+  overlay.id = 'profile-overlay';
+  overlay.onclick = closeProfile;
+
+  const pop = document.createElement('div');
+  pop.className = 'profile-pop';
+  pop.id = 'profile-pop';
+  pop.onclick = e => e.stopPropagation();
+  pop.innerHTML = `
+    <div class="pop-head">
+      <div class="pop-avatar">${initials}</div>
+      <div style="text-align:center;width:100%">
+        <div class="pop-name-wrap" id="pop-name-view" style="justify-content:center">
+          <span class="pop-name-display" id="pop-name-display">${xe(name)}</span>
+          <button class="pop-edit-btn" onclick="startEditName()" title="Editar nombre">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+            </svg>
+          </button>
+        </div>
+        <input class="pop-name-input" id="pop-name-input" value="${xe(name)}"
+          onkeydown="nameInputKey(event)" placeholder="Tu nombre">
+      </div>
+      <div class="pop-email">${xe(email)}</div>
+    </div>
+    <div class="pop-actions">
+      <button class="pop-action" onclick="closeProfile()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+        Cerrar
+      </button>
+    </div>`;
+
+  document.body.appendChild(overlay);
+  document.body.appendChild(pop);
+  document.addEventListener('keydown', profileKeydown);
+}
+
+function closeProfile() {
+  _profileOpen = false;
+  document.getElementById('profile-overlay')?.remove();
+  document.getElementById('profile-pop')?.remove();
+  document.removeEventListener('keydown', profileKeydown);
+}
+
+function profileKeydown(e) {
+  if (e.key === 'Escape') closeProfile();
+}
+
+function startEditName() {
+  document.getElementById('pop-name-view').style.display = 'none';
+  const inp = document.getElementById('pop-name-input');
+  inp.style.display = 'block';
+  inp.focus();
+  inp.select();
+}
+
+function nameInputKey(e) {
+  if (e.key === 'Enter') saveEditName();
+  if (e.key === 'Escape') cancelEditName();
+}
+
+function saveEditName() {
+  const val = document.getElementById('pop-name-input').value.trim();
+  if (!val) return;
+  const initials = val.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+  document.getElementById('user-name').textContent = val;
+  document.getElementById('user-avatar').textContent = initials;
+  localStorage.setItem('pbia_user_name', val);
+  closeProfile();
+}
+
+function cancelEditName() {
+  document.getElementById('pop-name-input').style.display = 'none';
+  document.getElementById('pop-name-view').style.display = 'flex';
+}
+</script>
+</body>
+</html>
