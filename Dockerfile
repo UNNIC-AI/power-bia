@@ -1,12 +1,15 @@
 FROM python:3.12-slim
 
-# Install .NET 10 runtime
-RUN apt-get update && apt-get install -y wget apt-transport-https ca-certificates && \
-    wget https://packages.microsoft.com/config/debian/12/packages-microsoft-prod.deb -O /tmp/packages-microsoft-prod.deb && \
-    dpkg -i /tmp/packages-microsoft-prod.deb && \
-    apt-get update && \
-    apt-get install -y dotnet-runtime-10.0 && \
-    rm -rf /var/lib/apt/lists/* /tmp/packages-microsoft-prod.deb
+# Install .NET 10 runtime via official install script
+RUN apt-get update && apt-get install -y curl && \
+    curl -sSL https://dot.net/v1/dotnet-install.sh -o /tmp/dotnet-install.sh && \
+    chmod +x /tmp/dotnet-install.sh && \
+    /tmp/dotnet-install.sh --runtime dotnet --channel 10.0 && \
+    rm /tmp/dotnet-install.sh && \
+    rm -rf /var/lib/apt/lists/*
+
+ENV DOTNET_ROOT="/root/.dotnet"
+ENV PATH="$PATH:/root/.dotnet"
 
 WORKDIR /app
 COPY requirements.txt .
