@@ -61,16 +61,14 @@ _CLIENT_ID, _TENANT_ID, _CLIENT_SECRET, _WORKSPACE_NAME, _DATASET_NAME = _parse_
 _token_cache: dict = {}
 _pbi_ids: dict = {}
 
-def _get_token() -> str:
+def _get_token(scope: str = "https://analysis.windows.net/powerbi/api/.default") -> str:
     app = msal.ConfidentialClientApplication(
         _CLIENT_ID,
         authority=f"https://login.microsoftonline.com/{_TENANT_ID}",
         client_credential=_CLIENT_SECRET,
         token_cache=msal.SerializableTokenCache(),
     )
-    result = app.acquire_token_for_client(
-        scopes=["https://analysis.windows.net/powerbi/api/.default"]
-    )
+    result = app.acquire_token_for_client(scopes=[scope])
     if "access_token" not in result:
         raise RuntimeError(f"Error obteniendo token Azure AD: {result.get('error_description')}")
     return result["access_token"]
@@ -78,7 +76,7 @@ def _get_token() -> str:
 def _get_pbi_ids() -> tuple[str, str]:
     if _pbi_ids:
         return _pbi_ids["workspace_id"], _pbi_ids["dataset_id"]
-    token = _get_token()
+    token = _get_token("https://api.powerbi.com/.default")
     headers = {"Authorization": f"Bearer {token}"}
 
     groups = requests.get("https://api.powerbi.com/v1.0/myorg/groups", headers=headers).json()
@@ -167,7 +165,7 @@ def _ejecutar_dax_adomd(dax: str):
 
 def _ejecutar_dax_rest(dax: str):
     try:
-        token = _get_token()
+        token = _get_token("https://api.powerbi.com/.default")
         wid, did = _get_pbi_ids()
         headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
         body = {"queries": [{"query": dax}], "serializerSettings": {"includeNulls": True}}
