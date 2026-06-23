@@ -76,7 +76,7 @@ def _get_token(scope: str = "https://analysis.windows.net/powerbi/api/.default")
 def _get_pbi_ids() -> tuple[str, str]:
     if _pbi_ids:
         return _pbi_ids["workspace_id"], _pbi_ids["dataset_id"]
-    token = _get_token("https://api.powerbi.com/.default")
+    token = _get_token()
     headers = {"Authorization": f"Bearer {token}"}
 
     groups = requests.get("https://api.powerbi.com/v1.0/myorg/groups", headers=headers).json()
@@ -165,7 +165,7 @@ def _ejecutar_dax_adomd(dax: str):
 
 def _ejecutar_dax_rest(dax: str):
     try:
-        token = _get_token("https://api.powerbi.com/.default")
+        token = _get_token()
         wid, did = _get_pbi_ids()
         headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
         body = {"queries": [{"query": dax}], "serializerSettings": {"includeNulls": True}}
