@@ -138,22 +138,25 @@ Genera la consulta DAX considerando el contexto."""
 
 # --- Capa 3: ejecución (determinista, SIN IA) ---------------------------
 
-import subprocess, json as _json, pathlib as _pathlib
+import subprocess, json as _json, pathlib as _pathlib, platform as _platform
 
-_ADOMD_BIN = _pathlib.Path(__file__).parent / "adomd_bin" / "adomd_wrapper"
+_ADOMD_DIR = _pathlib.Path(__file__).parent / "adomd_bin"
+_ADOMD_BIN = _ADOMD_DIR / "adomd_wrapper"
+_ADOMD_DLL = _ADOMD_DIR / "adomd_wrapper.dll"
 
 def ejecutar_dax(dax: str):
-    """Ejecuta DAX contra Power BI. Usa el binario ADOMD si está disponible, REST API si no."""
-    if _ADOMD_BIN.exists():
+    """Ejecuta DAX contra Power BI. Usa ADOMD.NET si está disponible, REST API si no."""
+    if _ADOMD_DLL.exists():
         return _ejecutar_dax_adomd(dax)
     return _ejecutar_dax_rest(dax)
 
 def _ejecutar_dax_adomd(dax: str):
     try:
-        result = subprocess.run(
-            [str(_ADOMD_BIN), CONNECTION_STRING, dax],
-            capture_output=True, text=True, timeout=60,
-        )
+        if _platform.system() == "Linux":
+            cmd = ["dotnet", str(_ADOMD_DLL), CONNECTION_STRING, dax]
+        else:
+            cmd = [str(_ADOMD_BIN), CONNECTION_STRING, dax]
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
         if result.returncode != 0:
             return pd.DataFrame(), result.stderr.strip()
         rows = _json.loads(result.stdout)
