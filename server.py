@@ -21,10 +21,7 @@ _HTML_PATH = pathlib.Path(__file__).parent / "index.html"
 _HTML_CACHE: str | None = None
 
 def _html() -> str:
-    global _HTML_CACHE
-    if _HTML_CACHE is None:
-        _HTML_CACHE = _HTML_PATH.read_text(encoding="utf-8")
-    return _HTML_CACHE
+    return _HTML_PATH.read_text(encoding="utf-8")
 
 
 # ---------- Conversión DataFrame → card ----------
@@ -41,48 +38,71 @@ def _fmt(v) -> str:
     return str(v)
 
 
-def _df_to_table_card(df: pd.DataFrame) -> dict:
-    cols = df.columns.tolist()
-    rows = [[ _fmt(v) for v in row] for _, row in df.head(50).iterrows()]
+_COL_ES = {
+    "Store Name": "Tienda", "Category Name": "Categoría", "Vendor Name": "Proveedor",
+    "City": "Ciudad", "County": "Condado", "State": "Estado",
+    "Bottles Sold": "Botellas vendidas", "Invoice": "Factura",
+    "Invoice Date": "Fecha factura", "Description": "Descripción",
+    "Retail Price": "Precio retail", "Bottle Cost": "Coste botella",
+    "AñoMesCorto": "Mes", "Año Mes": "Año/Mes", "Año": "Año",
+    "Mes": "Mes", "Trimestre": "Trimestre", "Fecha": "Fecha",
+    "Zip Code": "Código postal", "Address": "Dirección",
+    "Category": "Categoría", "Vendor": "Proveedor", "Store": "Tienda",
+}
+
+def _col_label(col: str, lang: str = "es") -> str:
+    """'Calendar[#Año]' → 'Año' (es) o 'Year' (en)"""
+    if '[' in col:
+        col = col[col.rfind('['):]
+    col = col.strip('[]').replace('#', '').replace('_', ' ').strip()
+    if lang == "es":
+        return _COL_ES.get(col, col)
+    return col
+
+
+def _df_to_table_card(df: pd.DataFrame, lang: str = "es") -> dict:
+    cols = [_col_label(c, lang) for c in df.columns]
+    rows = [[_fmt(v) for v in row] for _, row in df.head(1000).iterrows()]
     return {"kind": "table", "title": None, "sub": None, "cols": cols, "rows": rows}
 
 
-def _df_to_card(df: pd.DataFrame, pregunta: str, quiere_grafico: bool = False) -> dict | None:
+def _df_to_card(df: pd.DataFrame, chart_type: str = "table", title: str = "", lang: str = "es") -> dict | None:
+    """Construye la card según el chart_type y título decididos por el LLM."""
     if df.empty:
         return None
     num_cols = df.select_dtypes(include="number").columns.tolist()
     cat_cols = [c for c in df.columns if c not in num_cols]
 
-    # KPI: una sola celda numérica → siempre mostrar como KPI
+    # KPI: forma de los datos manda siempre
     if not cat_cols and len(num_cols) == 1 and len(df) == 1:
-        return {"kind": "kpi", "title": num_cols[0], "sub": None, "unit": None,
-                "data": [{"label": num_cols[0], "value": float(df[num_cols[0]].iloc[0])}]}
+        label = title or _col_label(num_cols[0], lang)
+        return {"kind": "kpi", "title": label, "sub": None, "unit": None,
+                "data": [{"label": label, "value": float(df[num_cols[0]].iloc[0])}]}
 
-    # Sin columnas numéricas → tabla siempre
     if not num_cols:
-        return _df_to_table_card(df)
-
-    # Solo tabla a menos que el usuario pida explícitamente un gráfico
-    if not quiere_grafico:
-        return _df_to_table_card(df)
-
-    # Gráfico: necesitamos al menos una columna categórica
-    if not cat_cols:
-        return _df_to_table_card(df)
+        return _df_to_table_card(df, lang)
 
     y = num_cols[-1]
-    x = cat_cols[0]
-    is_temporal = any(t in x.lower() for t in
-                      ["mes", "año", "fecha", "periodo", "trimestre", "semana", "dia", "month", "year"])
+    x = cat_cols[0] if cat_cols else None
+    card_title = title or f"{_col_label(y, lang)} por {_col_label(x, lang)}"
 
-    # Para gráficos de barras con muchos items: top 12 ordenado por valor
-    if not is_temporal:
-        df = df.nlargest(12, y)
+    if chart_type == "pie" and x:
+        data = sorted(
+            [{"label": str(row[x]), "value": float(row[y]) if pd.notna(row[y]) else 0}
+             for _, row in df.iterrows()],
+            key=lambda d: -d["value"]
+        )[:10]
+        if sum(d["value"] for d in data) > 0:
+            return {"kind": "pie", "title": card_title, "sub": None, "data": data}
 
-    data = [{"label": str(row[x]), "value": float(row[y]) if pd.notna(row[y]) else 0}
-            for _, row in df.iterrows()]
-    kind = "line" if is_temporal else "bar"
-    return {"kind": kind, "title": f"{y} por {x}", "sub": None, "data": data}
+    if chart_type in ("bar", "line") and x:
+        if chart_type == "bar":
+            df = df.nlargest(15, y)
+        data = [{"label": str(row[x]), "value": float(row[y]) if pd.notna(row[y]) else 0}
+                for _, row in df.iterrows()]
+        return {"kind": chart_type, "title": card_title, "sub": None, "data": data}
+
+    return _df_to_table_card(df, lang)
 
 
 # ---------- Sugerencias de seguimiento ----------
@@ -108,6 +128,21 @@ async def root(pbi_session: str = Cookie(default=None)):
 async def chat(request: Request, pbi_session: str = Cookie(default=None)):
     body = await request.json()
     text: str = body.get("text", "").strip()
+    lang: str = body.get("lang", "es")
+    filters: list = body.get("filters", [])
+    forced_chart_type: str | None = body.get("chart_type")
+    idioma = "inglés" if lang == "en" else "español"
+
+    # Build natural-language filter context to inject into LLM queries
+    filter_ctx = ""
+    if filters:
+        parts = [
+            f"{f['column']}: {', '.join(str(v) for v in f['values'][:20])}"
+            for f in filters if f.get("values")
+        ]
+        if parts:
+            filter_ctx = " (filtros activos: " + "; ".join(parts) + ")"
+    effective_text = text + filter_ctx
 
     if not text:
         return JSONResponse({"text": "", "card": None, "followups": []})
@@ -116,17 +151,58 @@ async def chat(request: Request, pbi_session: str = Cookie(default=None)):
     session_id = pbi_session or "default"
     hist_assistant = _sessions.get(session_id, [])
 
-    intencion = A.enrutar(text)
+    intencion = A.enrutar(effective_text)
+
+    # Si el último turno era una aclaración pendiente, la respuesta del usuario
+    # siempre es un seguimiento — aunque parezca CONVERSACION al router.
+    last_entry = hist_assistant[-1] if hist_assistant else None
+    if last_entry and last_entry.get("aclaracion_pendiente") and intencion == "CONVERSACION":
+        intencion = "SEGUIMIENTO"
 
     if intencion == "CONVERSACION":
-        resp_text = A.responder_conversacion(text)
+        resp_text = A.responder_conversacion(text, idioma=idioma)
         return JSONResponse({"text": resp_text, "card": None, "followups": []})
 
-    # CONSULTA o SEGUIMIENTO
-    dax = A.generar_dax(text, hist_assistant)
+    if intencion == "FILTRO":
+        col_info = A.identificar_columna_filtro(text, idioma=idioma)
+        dax_distinct = col_info.get("dax", f"EVALUATE DISTINCT('{col_info['tabla']}'[{col_info['columna']}])")
+        df_f, err_f = A.ejecutar_dax(dax_distinct)
+        if not err_f and not df_f.empty:
+            vals = sorted(df_f.iloc[:, 0].dropna().astype(str).tolist())[:100]
+            titulo = col_info.get("titulo", col_info.get("columna", "Filtro"))
+            card = {"kind": "filter", "title": titulo,
+                    "column": col_info.get("columna", ""), "values": vals, "selected": []}
+            msg = (f"Filter '{titulo}' created." if lang == "en"
+                   else f"Filtro '{titulo}' creado con {len(vals)} valores.")
+            return JSONResponse({"text": msg, "card": card, "followups": []})
+        return JSONResponse({"text": "No pude obtener los valores para ese filtro.", "card": None, "followups": []})
+
+    # GRAFICO_PREVIO: redibujar el último resultado con el tipo que pide el usuario
+    last_with_dax = next((e for e in reversed(hist_assistant) if e.get("dax")), None)
+    if intencion == "GRAFICO_PREVIO" and last_with_dax:
+        last = last_with_dax
+        df, error = A.ejecutar_dax(last["dax"])
+        if not error and not df.empty:
+            chart_type = A.decidir_tipo_grafico(text, list(df.columns))
+            card = _df_to_card(df, chart_type, lang=lang)
+            msg = "Here are your previous results in that format." if lang == "en" \
+                  else "Aquí tienes los datos de tu consulta anterior en ese formato."
+            return JSONResponse({"text": msg, "card": card, "followups": []})
+
+    # CONSULTA o SEGUIMIENTO (y GRAFICO_PREVIO sin historial)
+    dax = A.generar_dax(effective_text, hist_assistant, idioma=idioma)
 
     if dax.startswith("NECESITA_ACLARACION:"):
         aclaracion = dax.replace("NECESITA_ACLARACION:", "").strip()
+        # Guardar en historial para que la siguiente respuesta del usuario tenga contexto
+        _sessions.setdefault(session_id, []).append({
+            "pregunta": text,
+            "dax": None,
+            "aclaracion_pendiente": aclaracion,
+            "columnas": [],
+            "ejemplo": [],
+        })
+        _sessions[session_id] = _sessions[session_id][-5:]
         return JSONResponse({"text": aclaracion, "card": None, "followups": []})
 
     if dax.startswith("FUERA_DE_RANGO:"):
@@ -137,14 +213,13 @@ async def chat(request: Request, pbi_session: str = Cookie(default=None)):
     if error:
         print(f"[DAX ERROR] {error}", flush=True)
         print(f"[DAX QUERY] {dax}", flush=True)
-        dax2 = A.corregir_dax(text, dax, error, hist_assistant)
+        dax2 = A.corregir_dax(effective_text, dax, error, hist_assistant, idioma=idioma)
         df2, error2 = A.ejecutar_dax(dax2)
         if not error2:
             dax, df, error = dax2, df2, None
         else:
             print(f"[DAX ERROR 2] {error2}", flush=True)
 
-    # Guardar contexto rico en sesión (igual que Streamlit)
     if not error and not df.empty:
         _sessions.setdefault(session_id, []).append({
             "pregunta": text,
@@ -154,13 +229,11 @@ async def chat(request: Request, pbi_session: str = Cookie(default=None)):
         })
         _sessions[session_id] = _sessions[session_id][-5:]
 
-    quiere_grafico = any(p in text.lower() for p in ["gráfic", "grafic", "evolución", "evolucion", "tendencia"])
-    resp_text = A.responder_datos(text, dax, df, error, quiere_grafico)
-    card = _df_to_card(df, text, quiere_grafico) if not error else None
-
-    followups = _FOLLOWUPS_TEMPLATE[:2] if not error and not df.empty else []
-
-    return JSONResponse({"text": resp_text, "card": card, "followups": followups})
+    resp_text, chart_type, chart_title = A.responder_datos(effective_text, dax, df, error, idioma=idioma)
+    if forced_chart_type and forced_chart_type in {"kpi", "bar", "line", "pie", "table"}:
+        chart_type = forced_chart_type
+    card = _df_to_card(df, chart_type, chart_title, lang=lang) if not error else None
+    return JSONResponse({"text": resp_text, "card": card, "followups": []})
 
 
 # ---------- Arranque ----------

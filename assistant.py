@@ -18,7 +18,8 @@ import pandas as pd
 from openai import OpenAI
 
 from system_context import construir_system, ROL_ENRUTADOR, ROL_GENERADOR, \
-    ROL_CORRECTOR, ROL_REDACTOR, ROL_CONVERSACION
+    ROL_CORRECTOR, ROL_REDACTOR, ROL_CONVERSACION, ROL_SELECTOR_GRAFICO, \
+    ROL_IDENTIFICADOR_FILTRO
 
 # --- Configuración -------------------------------------------------------
 
@@ -38,6 +39,7 @@ cliente = OpenAI(api_key=_api_key)
 MODELO_LLM = "gpt-4.1"   # actualizado desde gpt-4o
 
 import re
+import json as _json_stdlib
 import requests
 import msal
 
@@ -110,21 +112,53 @@ def _limpiar_dax(texto: str) -> str:
     return texto.replace("```DAX", "").replace("```dax", "").replace("```", "").strip()
 
 
+def _parchear_dax(dax: str) -> str:
+    """
+    Corrección determinista de errores DAX frecuentes del LLM, sin llamar al modelo.
+
+    Caso: SUMMARIZECOLUMNS sin columna de agrupación — el LLM pone una medida
+    como primer argumento:
+      SUMMARIZECOLUMNS("Nombre", expr, FILTER(...))
+    → se convierte a:
+      ROW("Nombre", CALCULATE(expr, FILTER(...)))
+    """
+    import re as _re
+    # Detecta: SUMMARIZECOLUMNS( seguido de una cadena literal (medida) como 1er arg
+    m = _re.match(
+        r'(?i)(EVALUATE\s+)?SUMMARIZECOLUMNS\s*\(\s*"([^"]+)"\s*,\s*(.+)\)\s*$',
+        dax.strip(),
+        flags=_re.DOTALL,
+    )
+    if m:
+        nombre = m.group(2)
+        resto = m.group(3).strip()
+        # Separar expresión de medida del FILTER (si lo hay)
+        # Heurística: si hay FILTER(...) al final, usarlo como contexto de CALCULATE
+        filtro_m = _re.search(r',\s*(FILTER\s*\(.+\))\s*$', resto, flags=_re.DOTALL)
+        if filtro_m:
+            expr = resto[:filtro_m.start()].strip().rstrip(',').strip()
+            filtro = filtro_m.group(1).strip()
+            return f'EVALUATE\nROW("{nombre}", CALCULATE({expr}, {filtro}))'
+        else:
+            return f'EVALUATE\nROW("{nombre}", {resto})'
+    return dax
+
+
 # --- Capa 1: enrutado ----------------------------------------------------
 
 def enrutar(pregunta: str) -> str:
     """Devuelve: CONVERSACION | CONSULTA | GRAFICO_PREVIO | SEGUIMIENTO."""
     system = construir_system(ROL_ENRUTADOR)
     categoria = _chat(system, pregunta).upper().strip()
-    validas = {"CONVERSACION", "CONSULTA", "GRAFICO_PREVIO", "SEGUIMIENTO"}
+    validas = {"CONVERSACION", "CONSULTA", "GRAFICO_PREVIO", "SEGUIMIENTO", "FILTRO"}
     # Defensa: si el modelo devuelve algo raro, tratamos como consulta.
     return categoria if categoria in validas else "CONSULTA"
 
 
 # --- Capa 2: generación --------------------------------------------------
 
-def generar_dax(pregunta: str, historial: list | None = None) -> str:
-    system = construir_system(ROL_GENERADOR, incluir_esquema=True, incluir_tiempo=True)
+def generar_dax(pregunta: str, historial: list | None = None, idioma: str = "español") -> str:
+    system = construir_system(ROL_GENERADOR, incluir_esquema=True, incluir_tiempo=True, idioma=idioma)
     contexto = (historial or [])[-5:]
     user = f"""Contexto reciente de consultas:
 {contexto}
@@ -133,7 +167,7 @@ Pregunta actual:
 {pregunta}
 
 Genera la consulta DAX considerando el contexto."""
-    return _limpiar_dax(_chat(system, user))
+    return _parchear_dax(_limpiar_dax(_chat(system, user)))
 
 
 # --- Capa 3: ejecución (determinista, SIN IA) ---------------------------
@@ -189,8 +223,8 @@ def _ejecutar_dax_rest(dax: str):
 # --- Capa 4: corrección --------------------------------------------------
 
 def corregir_dax(pregunta: str, dax_fallido: str, error: str,
-                 historial: list | None = None) -> str:
-    system = construir_system(ROL_CORRECTOR, incluir_esquema=True, incluir_tiempo=True)
+                 historial: list | None = None, idioma: str = "español") -> str:
+    system = construir_system(ROL_CORRECTOR, incluir_esquema=True, incluir_tiempo=True, idioma=idioma)
     user = f"""Pregunta original:
 {pregunta}
 
@@ -201,33 +235,68 @@ Error devuelto por Power BI:
 {error}
 
 Genera el DAX corregido."""
-    return _limpiar_dax(_chat(system, user))
+    return _parchear_dax(_limpiar_dax(_chat(system, user)))
 
 
 # --- Capa 5: respuesta ---------------------------------------------------
 
-def responder_datos(pregunta: str, dax: str, df: pd.DataFrame, error: str | None,
-                    quiere_grafico: bool) -> str:
-    # El redactor necesita el rango temporal para explicar bien los resultados
-    # vacíos cuando se pide un periodo fuera de los datos disponibles.
-    system = construir_system(ROL_REDACTOR, incluir_tiempo=True)
+def responder_datos(pregunta: str, dax: str, df: pd.DataFrame,
+                    error: str | None, idioma: str = "español") -> tuple[str, str, str]:
+    """Devuelve (texto_respuesta, chart_type, title). El LLM decide tipo y título."""
+    system = construir_system(ROL_REDACTOR, incluir_tiempo=True, idioma=idioma)
     vacio = (not error) and df.empty
     datos = (f"Error al ejecutar: {error}" if error
              else ("La consulta no devolvió ninguna fila." if vacio
-                    else df.head(30).to_dict(orient="records")))
+                    else df.head(5).to_dict(orient="records")))
     user = f"""Pregunta del usuario:
 {pregunta}
-
-¿Pidió gráfico?: {"sí" if quiere_grafico else "no"}
-¿Resultado vacío?: {"sí" if vacio else "no"}
 
 Resultado de la consulta:
 {datos}
 
-Responde en lenguaje natural de negocio."""
-    return _chat(system, user)
+Responde en JSON."""
+    raw = _chat(system, user)
+    try:
+        limpio = re.sub(r"^```(?:json)?\s*|\s*```$", "", raw.strip(), flags=re.MULTILINE)
+        parsed = _json_stdlib.loads(limpio)
+        text = parsed.get("text", raw)
+        chart_type = parsed.get("chart_type", "table")
+        title = parsed.get("title", "")
+    except Exception:
+        text_match = re.search(r'"text"\s*:\s*"((?:[^"\\]|\\.)*)"', raw, re.DOTALL)
+        chart_match = re.search(r'"chart_type"\s*:\s*"(\w+)"', raw)
+        title_match = re.search(r'"title"\s*:\s*"((?:[^"\\]|\\.)*)"', raw)
+        text = text_match.group(1).replace('\\"', '"').replace('\\n', '\n') if text_match else raw
+        chart_type = chart_match.group(1) if chart_match else "table"
+        title = title_match.group(1) if title_match else ""
+    validos = {"kpi", "bar", "line", "pie", "table", "none"}
+    return text, (chart_type if chart_type in validos else "table"), title
 
 
-def responder_conversacion(pregunta: str) -> str:
-    system = construir_system(ROL_CONVERSACION)
+def decidir_tipo_grafico(peticion: str, columnas: list) -> str:
+    """Decide el tipo de visualización para redibujar el resultado anterior."""
+    system = construir_system(ROL_SELECTOR_GRAFICO)
+    user = f"""El usuario pide: "{peticion}"
+Las columnas del resultado son: {columnas}"""
+    resultado = _chat(system, user).strip().lower()
+    validos = {"kpi", "bar", "line", "pie", "table"}
+    return resultado if resultado in validos else "bar"
+
+
+def identificar_columna_filtro(pregunta: str, idioma: str = "español") -> dict:
+    """Identifica la tabla/columna para un filtro y genera el DAX DISTINCT."""
+    system = construir_system(ROL_IDENTIFICADOR_FILTRO, incluir_esquema=True, idioma=idioma)
+    raw = _chat(system, pregunta)
+    try:
+        limpio = re.sub(r'^```(?:json)?\s*|\s*```$', '', raw.strip(), flags=re.MULTILINE)
+        return _json_stdlib.loads(limpio)
+    except Exception:
+        return {
+            "tabla": "Stores", "columna": "Store Name", "titulo": "Tiendas",
+            "dax": "EVALUATE DISTINCT('Stores'[Store Name])"
+        }
+
+
+def responder_conversacion(pregunta: str, idioma: str = "español") -> str:
+    system = construir_system(ROL_CONVERSACION, idioma=idioma)
     return _chat(system, pregunta)

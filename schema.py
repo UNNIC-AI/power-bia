@@ -44,7 +44,7 @@ TABLAS = {
         "columnas": {
             "Date":        {"tipo": "datetime", "ejemplo": "2012-07-02", "agregable": False},
             "FechaSK":     {"tipo": "entero",   "ejemplo": 20120702,     "agregable": False,
-                            "nota": "Clave subrogada AAAAMMDD. Úsala para ORDER BY cronológico fiable."},
+                            "nota": "Clave subrogada AAAAMMDD. NO usar en ORDER BY: en agrupaciones mensuales hay N valores por grupo y Power BI falla. Usa Año#Mes para ordenar."},
             "#Año":        {"tipo": "entero",   "ejemplo": 2012,         "agregable": False,
                             "nota": "Filtrar por año SIN comillas: 'Calendar'[#Año] = 2016"},
             "#Trimestre":  {"tipo": "entero",   "ejemplo": 3,            "agregable": False},
