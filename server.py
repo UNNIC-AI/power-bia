@@ -233,7 +233,7 @@ async def chat(request: Request, pbi_session: str = Cookie(default=None)):
     if forced_chart_type and forced_chart_type in {"kpi", "bar", "line", "pie", "table"}:
         chart_type = forced_chart_type
     card = _df_to_card(df, chart_type, chart_title, lang=lang) if not error else None
-    return JSONResponse({"text": resp_text, "card": card, "followups": []})
+    return JSONResponse({"text": resp_text, "card": card, "followups": [], "dax": dax})
 
 
 # ---------- Arranque ----------

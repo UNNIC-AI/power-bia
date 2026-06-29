@@ -582,6 +582,12 @@
       border-radius: var(--r);
       overflow: hidden;
     }
+    .msg-bot .card {
+      margin-top: 4px;
+      border-top-left-radius: 0;
+      border-left-width: 2px;
+      border-left-color: rgba(0,200,255,0.28);
+    }
 
     .card-head {
       padding: 9px 14px 8px;
@@ -604,28 +610,51 @@
       border-radius: 3px;
       flex-shrink: 0;
     }
+    .card-kind-kpi   { color: var(--amber);  border-color: rgba(245,166,35,0.4); }
+    .card-kind-line  { color: var(--green);  border-color: rgba(0,229,160,0.35); }
+    .card-kind-pie   { color: #A78BFA;       border-color: rgba(167,139,250,0.35); }
+    .card-kind-table { color: var(--text-2); border-color: var(--border-2); }
 
     .card-title { font-size: 12.5px; font-weight: 500; color: var(--text); font-family: var(--font-ui); }
     .card-sub   { font-size: 11px; color: var(--text-3); font-family: var(--font-data); }
     .card-body  { padding: 14px 16px; }
 
     /* KPI */
+    .kpi-body {
+      padding: 28px 20px 24px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+    .kpi-body::before {
+      content: '';
+      position: absolute;
+      top: -24px; left: 50%; transform: translateX(-50%);
+      width: 260px; height: 130px;
+      background: radial-gradient(ellipse, rgba(245,166,35,0.13) 0%, transparent 68%);
+      pointer-events: none;
+    }
     .kpi-num {
       font-family: var(--font-data);
-      font-size: 56px;
+      font-size: 60px;
       font-weight: 600;
       color: var(--amber);
       letter-spacing: -0.04em;
       line-height: 1;
+      text-shadow: 0 0 36px rgba(245,166,35,0.45);
+      position: relative;
     }
-
     .kpi-label {
-      margin-top: 8px;
-      font-size: 11px;
+      margin-top: 10px;
+      font-size: 10.5px;
       color: var(--text-3);
       font-family: var(--font-data);
       text-transform: uppercase;
-      letter-spacing: 0.08em;
+      letter-spacing: 0.1em;
+      position: relative;
     }
 
     /* Table */
@@ -1056,6 +1085,53 @@
     }
     #chart-tip .tip-label { color: #8BA3BF; font-size: 10.5px; margin-bottom: 2px; }
     #chart-tip .tip-val   { color: #F5A623; font-weight: 700; font-size: 13px; }
+
+    /* DAX toggle */
+    .dax-toggle {
+      margin-top: 7px;
+      align-self: flex-start;
+    }
+    .dax-toggle summary {
+      font-family: var(--font-data);
+      font-size: 9.5px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--text-3);
+      cursor: pointer;
+      list-style: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 2px 9px 2px 7px;
+      border: 1px solid var(--border-2);
+      border-radius: 3px;
+      user-select: none;
+      transition: color 0.12s, border-color 0.12s;
+    }
+    .dax-toggle summary::-webkit-details-marker { display: none; }
+    .dax-toggle summary:hover { color: var(--accent); border-color: rgba(0,200,255,0.35); }
+    .dax-toggle[open] summary { color: var(--accent); border-color: rgba(0,200,255,0.4); }
+    .dax-chevron { display: inline-block; transition: transform 0.15s; font-style: normal; }
+    .dax-toggle[open] .dax-chevron { transform: rotate(90deg); }
+    .dax-code {
+      margin-top: 6px;
+      background: var(--ground);
+      border: 1px solid var(--border);
+      border-left: 2px solid rgba(0,200,255,0.3);
+      border-radius: 0 var(--r-sm) var(--r-sm) var(--r-sm);
+      padding: 10px 14px;
+      font-family: var(--font-data);
+      font-size: 11px;
+      color: #8BA3BF;
+      white-space: pre;
+      overflow-x: auto;
+      line-height: 1.65;
+      max-width: 720px;
+    }
+    .dax-kw  { color: var(--accent); }
+    .dax-str { color: var(--green); }
+    .dax-num { color: var(--amber); }
 
     /* Followups */
     .followups { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
@@ -1634,7 +1710,8 @@
 
 <script>
 const API = '/api/chat';
-const COLORS = ['#00C8FF','#F5A623','#00E5A0','#60A5FA','#A78BFA','#FB923C','#38BDF8','#F472B6'];
+const COLORS = ['#00C8FF','#F5A623','#00E5A0','#60A5FA','#A78BFA','#2DD4BF','#38BDF8','#818CF8'];
+let _chartSeq = 0;
 
 // ── i18n ───────────────────────────────────────────────────────────────────
 const I18N = {
@@ -1964,6 +2041,16 @@ function mkEmpty() {
   return div;
 }
 
+function daxHighlight(code) {
+  const keywords = /\b(EVALUATE|SUMMARIZECOLUMNS|CALCULATETABLE|CALCULATE|FILTER|ALL|ALLEXCEPT|RELATED|RELATEDTABLE|SUM|SUMX|AVERAGE|AVERAGEX|COUNT|COUNTROWS|COUNTX|MAX|MAXX|MIN|MINX|DISTINCT|VALUES|ROW|TOPN|RANKX|IF|AND|OR|NOT|IN|TRUE|FALSE|BLANK|DIVIDE|FORMAT|EARLIER|USERELATIONSHIP|CROSSFILTER|GENERATE|UNION|INTERSECT|EXCEPT|ADDCOLUMNS|SELECTCOLUMNS|NATURALINNERJOIN|VAR|RETURN|ORDER\s+BY|DESC|ASC)\b/gi;
+  const escaped = code.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  return escaped
+    .replace(/'[^']*'\[[^\]]*\]/g, m => `<span class="dax-str">${m}</span>`)
+    .replace(/"([^"]*)"/g, (_, s) => `<span class="dax-str">"${s}"</span>`)
+    .replace(keywords, m => `<span class="dax-kw">${m}</span>`)
+    .replace(/\b(\d+(\.\d+)?)\b/g, m => `<span class="dax-num">${m}</span>`);
+}
+
 function mkMsg(m) {
   const wrap = document.createElement('div');
   wrap.className = 'msg msg-' + m.role;
@@ -1974,6 +2061,19 @@ function mkMsg(m) {
   wrap.appendChild(bub);
 
   if (m.card) { wrap.classList.add('has-card'); wrap.appendChild(mkCard(m.card)); }
+
+  if (m.dax && m.role === 'bot') {
+    const details = document.createElement('details');
+    details.className = 'dax-toggle';
+    const summary = document.createElement('summary');
+    summary.innerHTML = '<span class="dax-chevron">▸</span> DAX';
+    details.appendChild(summary);
+    const pre = document.createElement('pre');
+    pre.className = 'dax-code';
+    pre.innerHTML = daxHighlight(m.dax);
+    details.appendChild(pre);
+    wrap.appendChild(details);
+  }
 
   if (m.followups && m.followups.length) {
     const fu = document.createElement('div');
@@ -2016,14 +2116,14 @@ function mkCard(card) {
   const head = document.createElement('div');
   head.className = 'card-head';
   head.innerHTML =
-    `<span class="card-kind">${kinds[card.kind] || card.kind}</span>` +
+    `<span class="card-kind card-kind-${card.kind}">${kinds[card.kind] || card.kind}</span>` +
     (card.title ? `<span class="card-title">${xe(card.title)}</span>` : '') +
     (card.sub   ? `<span class="card-sub">${xe(card.sub)}</span>` : '');
 
   el.appendChild(head);
 
   const body = document.createElement('div');
-  body.className = 'card-body';
+  body.className = card.kind === 'kpi' ? 'card-body kpi-body' : 'card-body';
 
   switch (card.kind) {
     case 'kpi':   body.appendChild(mkKPI(card));       break;
@@ -2161,6 +2261,7 @@ function mkBarChart(card) {
   const data = (card.data || []).slice(0, 15);
   if (!data.length) return document.createElement('div');
 
+  const cid = 'bc' + (++_chartSeq);
   const maxLblLen = Math.max(...data.map(d => String(d.label).length));
   const rotateLabels = maxLblLen > 7 || data.length > 8;
 
@@ -2179,6 +2280,21 @@ function mkBarChart(card) {
   svg.setAttribute('width', W);
   svg.setAttribute('class', 'chart-svg');
 
+  // Gradient defs — one per color slot
+  const defs = document.createElementNS(ns, 'defs');
+  COLORS.forEach((c, ci) => {
+    const g = document.createElementNS(ns, 'linearGradient');
+    g.id = `${cid}_g${ci}`;
+    setA(g, { x1: 0, y1: 0, x2: 0, y2: 1 });
+    const s1 = document.createElementNS(ns, 'stop');
+    setA(s1, { offset: '0%', 'stop-color': c, 'stop-opacity': '0.92' });
+    const s2 = document.createElementNS(ns, 'stop');
+    setA(s2, { offset: '100%', 'stop-color': c, 'stop-opacity': '0.3' });
+    g.appendChild(s1); g.appendChild(s2);
+    defs.appendChild(g);
+  });
+  svg.appendChild(defs);
+
   for (let i = 0; i <= 4; i++) {
     const val = max * i / 4;
     const y = pT + pH - (val / max) * pH;
@@ -2195,17 +2311,23 @@ function mkBarChart(card) {
     const cx = pL + step * i + step / 2;
     const bh = Math.max(2, (d.value / max) * pH);
     const y = pT + pH - bh;
-    const col = COLORS[i % COLORS.length];
+    const ci = i % COLORS.length;
+    const col = COLORS[ci];
 
     const rect = document.createElementNS(ns, 'rect');
-    setA(rect, { x: cx - bw / 2, y, width: bw, height: bh, rx: 3, fill: col, opacity: 0.85, style: 'cursor:pointer' });
+    setA(rect, { x: cx - bw / 2, y, width: bw, height: bh, rx: 3, fill: `url(#${cid}_g${ci})`, style: 'cursor:pointer' });
     rect.addEventListener('mousemove', e => tipShow(e, String(d.label), fmtNum(d.value)));
     rect.addEventListener('mouseleave', tipHide);
     svg.appendChild(rect);
 
+    // Top glow cap
+    const cap = document.createElementNS(ns, 'rect');
+    setA(cap, { x: cx - bw / 2, y, width: bw, height: Math.min(bh, 4), rx: 3, fill: col, opacity: '0.6', 'pointer-events': 'none' });
+    svg.appendChild(cap);
+
     if (n <= 12) {
       const vt = document.createElementNS(ns, 'text');
-      setA(vt, { x: cx, y: y - 5, 'text-anchor': 'middle', 'font-size': 9.5, 'font-weight': 600, 'font-family': 'JetBrains Mono,monospace', fill: '#6B82A0' });
+      setA(vt, { x: cx, y: y - 5, 'text-anchor': 'middle', 'font-size': 9.5, 'font-weight': 600, 'font-family': 'JetBrains Mono,monospace', fill: col });
       vt.textContent = fmtNum(d.value);
       svg.appendChild(vt);
     }
@@ -2450,7 +2572,7 @@ async function submit() {
     });
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
     const d = await r.json();
-    botMsg = { role: 'bot', text: d.text || '—', card: d.card || null, followups: d.followups || [], ts: Date.now() };
+    botMsg = { role: 'bot', text: d.text || '—', card: d.card || null, followups: d.followups || [], dax: d.dax || null, ts: Date.now() };
   } catch(e) {
     console.error('[fetch error]', e);
     botMsg = { role: 'bot', text: t('connError'), card: null, followups: [], ts: Date.now() };
