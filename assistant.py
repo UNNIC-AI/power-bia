@@ -245,9 +245,15 @@ def responder_datos(pregunta: str, dax: str, df: pd.DataFrame,
     """Devuelve (texto_respuesta, chart_type, title). El LLM decide tipo y título."""
     system = construir_system(ROL_REDACTOR, incluir_tiempo=True, idioma=idioma)
     vacio = (not error) and df.empty
-    datos = (f"Error al ejecutar: {error}" if error
-             else ("La consulta no devolvió ninguna fila." if vacio
-                    else df.head(5).to_dict(orient="records")))
+    FILAS_MAX_CONTEXTO = 50
+    if error:
+        datos = f"Error al ejecutar: {error}"
+    elif vacio:
+        datos = "La consulta no devolvió ninguna fila."
+    else:
+        muestra = df.head(FILAS_MAX_CONTEXTO).to_dict(orient="records")
+        datos = (muestra if len(df) <= FILAS_MAX_CONTEXTO
+                  else f"(mostrando {FILAS_MAX_CONTEXTO} de {len(df)} filas totales)\n{muestra}")
     user = f"""Pregunta del usuario:
 {pregunta}
 
