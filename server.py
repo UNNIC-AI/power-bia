@@ -79,12 +79,23 @@ def _df_to_card(df: pd.DataFrame, chart_type: str = "table", title: str = "", la
         return {"kind": "kpi", "title": label, "sub": None, "unit": None,
                 "data": [{"label": label, "value": float(df[num_cols[0]].iloc[0])}]}
 
+    # Sin columna categórica pero con varias numéricas (ej. Año + Revenue):
+    # la primera numérica hace de eje de categorías.
+    if not cat_cols and len(num_cols) >= 2:
+        cat_cols = [num_cols[0]]
+        num_cols = num_cols[1:]
+
     if not num_cols:
         return _df_to_table_card(df, lang)
 
     y = num_cols[-1]
     x = cat_cols[0] if cat_cols else None
-    card_title = title or f"{_col_label(y, lang)} por {_col_label(x, lang)}"
+    if title:
+        card_title = title
+    elif x:
+        card_title = f"{_col_label(y, lang)} por {_col_label(x, lang)}"
+    else:
+        card_title = _col_label(y, lang)
 
     if chart_type == "pie" and x:
         data = sorted(
@@ -98,6 +109,8 @@ def _df_to_card(df: pd.DataFrame, chart_type: str = "table", title: str = "", la
     if chart_type in ("bar", "line") and x:
         if chart_type == "bar":
             df = df.nlargest(15, y)
+            if pd.api.types.is_numeric_dtype(df[x]):
+                df = df.sort_values(x)
         data = [{"label": str(row[x]), "value": float(row[y]) if pd.notna(row[y]) else 0}
                 for _, row in df.iterrows()]
         return {"kind": chart_type, "title": card_title, "sub": None, "data": data}
