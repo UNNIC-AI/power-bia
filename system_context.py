@@ -151,6 +151,107 @@ Categorías:
 
 Responde SOLO con la palabra de la categoría, sin explicación."""
 
+ROL_DECISOR_VISUALIZACION = """\
+Tu tarea: decidir CÓMO se debe mostrar la respuesta a la pregunta del usuario, ANTES de que
+exista ningún dato — solo con la pregunta y el esquema del modelo. Tu decisión guiará después
+la generación del DAX, así que debes pensar en qué columnas y medidas hacen falta, no solo en
+el tipo de gráfico.
+
+Devuelve SIEMPRE un objeto JSON válido con esta estructura exacta (sin markdown):
+{
+  "modo": "tabla" | "grafico",
+  "chart_type": "table" | "kpi" | "bar" | "line" | "pie" | "area" | "multi_line" | "grouped_bar" | "stacked_bar" | "combo",
+  "eje_x": "<Tabla[Columna]>" | null,
+  "columna_serie": "<Tabla[Columna]>" | null,
+  "medida_1": "<nombre exacto de una medida del vocabulario de negocio>",
+  "medida_2": "<nombre exacto de otra medida>" | null,
+  "mostrar_tendencia": true | false,
+  "necesita_aclaracion": true | false,
+  "tipo_aclaracion": "texto" | "visual" | null,
+  "pregunta_aclaracion": "<pregunta breve en lenguaje de negocio>" | null,
+  "opciones_aclaracion": [ {"id": "...", "label": "...", "campo": "chart_type"|"eje_x"|"columna_serie", "valor": "..."} ] | null,
+  "titulo_sugerido": "<título corto para el gráfico, máx 50 chars>"
+}
+
+Cómo elegir "modo" y "chart_type":
+  1. Si el usuario pidió explícitamente un formato ("en barras", "circular", "quesito", "tabla",
+     "listado", "evolución", "tendencia", "compara A con B a lo largo del tiempo",
+     "una línea por cada...", "barras apiladas", "barras agrupadas", "combina X con Y")
+     → respétalo literalmente.
+  2. Si no especificó, infiere por la NATURALEZA de la pregunta (no has visto los datos aún):
+       · pide un total/número único                              → modo "grafico", chart_type "kpi"
+       · pide evolución/tendencia de UNA métrica en el tiempo     → "line"
+       · pide evolución de una métrica desagregada por otra
+         dimensión (por tienda, por categoría...)                 → "multi_line"
+       · pide comparar el MISMO periodo (mes, trimestre, semana)
+         entre varios años distintos ("por mes de 2020 y 2021",
+         "compara enero-diciembre de este año con el anterior")    → "multi_line"
+         (ver regla especial de año-a-año más abajo, NO uses el
+         mismo eje_x que para una evolución continua)
+       · pide comparar pocas categorías no temporales              → "bar"
+       · pide distribución/proporción/porcentaje entre pocas
+         categorías                                                → "pie"
+       · pide comparar la misma métrica entre categorías Y otra
+         dimensión a la vez, sumando el total                      → "stacked_bar"
+       · pide comparar varias categorías lado a lado (sin que
+         sumar tenga sentido)                                      → "grouped_bar"
+       · pide ver dos métricas distintas juntas (una de conteo/
+         volumen y otra de tipo precio/ratio)                      → "combo" (medida_1 = barra,
+                                                                       medida_2 = línea)
+       · pide tendencia acumulada / "área bajo la curva"           → "area"
+       · pide listado, facturas, detalle fila a fila, o no queda
+         claro que quiera gráfico                                   → modo "tabla", chart_type "table"
+  3. Ante la duda entre dos tipos de gráfico razonables → usa "necesita_aclaracion" (ver abajo),
+     NO adivines a ciegas.
+
+Cómo rellenar "eje_x" / "columna_serie" / "medida_1" / "medida_2":
+  - Usa SIEMPRE el formato "Tabla[Columna]" tal como aparece en el esquema.
+  - "eje_x": la dimensión principal (a menudo temporal: 'Calendar'[Año#Mes]; o categórica:
+    'Stores'[Store Name], 'Items'[Category Name]...). null solo si chart_type es "kpi".
+  - "columna_serie": SOLO rellena si chart_type es "multi_line", "grouped_bar" o "stacked_bar" —
+    es la dimensión que separa las series (ej. 'Items'[Category Name] si el usuario pide
+    "por categoría" además del eje temporal). En cualquier otro chart_type debe ser null.
+  - REGLA ESPECIAL — comparar el mismo periodo entre AÑOS distintos (ej. "precio por mes de
+    2020 y 2021", "compara este año con el anterior mes a mes"): el eje_x NUNCA puede ser una
+    columna que ya incluya el año (como 'Calendar'[Año#Mes] o 'Calendar'[AñoMesCorto]), porque
+    entonces cada año cae en etiquetas de eje X distintas y las líneas no se solapan. En su
+    lugar:
+      · "eje_x" = la columna de periodo SIN año: 'Calendar'[Mes] (o 'Calendar'[MesCorto] si
+        el usuario compara por trimestre/semana, la columna equivalente sin año).
+      · "columna_serie" = 'Calendar'[Año].
+    Así ambos años comparten las mismas 12 etiquetas de mes y las líneas se superponen para
+    poder compararse.
+  - "medida_1": el nombre EXACTO de una medida del vocabulario de negocio (ver "Medidas de
+    negocio" del esquema), nunca un nombre de columna DAX inventado.
+  - "medida_2": SOLO si chart_type es "combo" (la métrica que va en la línea del eje secundario).
+    En cualquier otro caso debe ser null.
+  - "mostrar_tendencia": true SOLO cuando chart_type sea "line" o "area" (una sola serie, no
+    "multi_line") Y el usuario haya pedido explícitamente ver la tendencia/dirección general
+    ("¿cuál es la tendencia?", "¿está subiendo o bajando?", "línea de tendencia", "trend").
+    NO lo pongas a true solo porque la pregunta sea sobre evolución en el tiempo: "evolución"
+    o "por mes" NO implican tendencia, el usuario tiene que pedir la tendencia en sí. En
+    cualquier otro chart_type debe ser false.
+
+Cuándo pedir aclaración y de qué tipo:
+  - "tipo_aclaracion": "texto" cuando la ambigüedad es de INTENCIÓN o de QUÉ DATOS quiere
+    (ej. "ventas" podría ser botellas o facturación en dinero) — pregunta breve en lenguaje
+    de negocio, igual que haría una persona del equipo de datos.
+  - Regla general: usa "tipo_aclaracion": "texto" también cuando el concepto de la pregunta
+    NO tenga una medida/columna correspondiente clara en el esquema o el vocabulario de
+    negocio — no fuerces la medida o dimensión más parecida solo por rellenar el campo.
+    Adivinar mal es peor que preguntar.
+  - "tipo_aclaracion": "visual" cuando la ambigüedad es de FORMATO (qué tipo de gráfico, o qué
+    columna usar como eje/serie) y hay 2-4 opciones concretas y enumerables. Rellena
+    "opciones_aclaracion" con esas opciones; cada opción indica en "campo" cuál de
+    chart_type/eje_x/columna_serie cambiaría y en "valor" con qué.
+  - Si "necesita_aclaracion" es true, el resto de campos (chart_type, eje_x, columna_serie,
+    medida_1, medida_2, titulo_sugerido) deben ir con tu MEJOR estimación (nunca vacíos ni
+    inventados de forma absurda), por si el sistema decide usarla como valor por defecto.
+  - No pidas más de una aclaración por turno.
+
+El campo "titulo_sugerido" debe describir lo que mostrará el gráfico, en el mismo idioma
+indicado en el contexto, basándote en la pregunta del usuario (no en datos, aún no existen)."""
+
 ROL_GENERADOR = """\
 Tu tarea: traducir la pregunta del usuario a UNA consulta DAX válida.
 
@@ -190,6 +291,63 @@ Reglas de construcción:
     en SUMMARIZECOLUMNS. Si necesitas una columna solo para ordenar, agrégala al
     SUMMARIZECOLUMNS antes de usarla en ORDER BY.
 
+  Series múltiples (multi_line / grouped_bar / stacked_bar) — FORMATO LARGO:
+  - Si la petición trae una "columna de serie" además del eje X, añádela como columna de
+    agrupación ADICIONAL en SUMMARIZECOLUMNS (después del eje X, antes del FILTER/medida).
+    El resultado debe tener UNA FILA por cada combinación (eje_x, columna_serie) — nunca
+    pivotes los valores de la serie a columnas separadas.
+    Ejemplo — evolución de ventas por categoría:
+      EVALUATE
+      CALCULATETABLE(
+          SUMMARIZECOLUMNS(
+              'Calendar'[Año#Mes],
+              'Calendar'[AñoMesCorto],
+              'Items'[Category Name],
+              "Ventas", SUM('Invoices'[Bottles Sold])
+          ),
+          'Calendar'[#Año] >= 2018,
+          'Calendar'[#Año] <= 2021
+      )
+      ORDER BY 'Calendar'[Año#Mes] ASC, 'Items'[Category Name] ASC
+
+  Comparar el mismo periodo entre AÑOS (columna_serie = 'Calendar'[Año]) — CASO ESPECIAL:
+  - Si columna_serie es 'Calendar'[Año], el eje_x NUNCA puede ser 'Calendar'[Año#Mes] ni
+    'Calendar'[AñoMesCorto] (ya incluyen el año: las series dejarían de solaparse). Usa la
+    columna de periodo SIN año (p.ej. 'Calendar'[Mes]) y agrega también 'Calendar'[#Mes]
+    SOLO para poder ordenar cronológicamente (Ene→Dic), sin proyectarla como eje_x.
+    Ejemplo — precio medio por mes, comparando 2020 y 2021:
+      EVALUATE
+      CALCULATETABLE(
+          SUMMARIZECOLUMNS(
+              'Calendar'[#Mes],
+              'Calendar'[Mes],
+              'Calendar'[Año],
+              "PrecioMedio", AVERAGE('Items'[State Bottle Retail])
+          ),
+          'Calendar'[#Año] IN {2020, 2021}
+      )
+      ORDER BY 'Calendar'[#Mes] ASC, 'Calendar'[Año] ASC
+
+  Gráfico combinado (combo, 2 medidas) — MISMA FILA, no formato largo:
+  - Si la petición trae dos medidas para un combinado, proyecta ambas como columnas de la
+    MISMA fila (una fila por eje_x), nunca en formato largo.
+    Ejemplo — ventas y precio medio por mes:
+      EVALUATE
+      CALCULATETABLE(
+          SUMMARIZECOLUMNS(
+              'Calendar'[Año#Mes],
+              'Calendar'[AñoMesCorto],
+              "Ventas", SUM('Invoices'[Bottles Sold]),
+              "PrecioMedio", AVERAGE('Items'[State Bottle Retail])
+          ),
+          'Calendar'[#Año] >= 2018,
+          'Calendar'[#Año] <= 2021
+      )
+      ORDER BY 'Calendar'[Año#Mes] ASC
+  - Si la petición indica nombres exactos para el alias de eje_x/columna_serie/medida_1/medida_2,
+    ÚSALOS TAL CUAL como el nombre de columna proyectada en el DAX (el mismo texto, entre
+    comillas), para que el resultado se pueda enlazar por nombre después.
+
   SUMMARIZECOLUMNS vs ROW — regla crítica:
   - SUMMARIZECOLUMNS SIEMPRE necesita al menos una columna de agrupación como
     primer argumento. Su sintaxis es:
@@ -205,6 +363,11 @@ Reglas de construcción:
 Aclaraciones y fuera de rango:
   - Si la pregunta es genuinamente ambigua (varias columnas posibles), responde EXACTAMENTE:
         NECESITA_ACLARACION: <pregunta breve en lenguaje de negocio>
+  - Regla general: si NO entiendes bien qué pide el usuario — un concepto de negocio que no
+    aparece en las medidas ni en los sinónimos del esquema, una referencia poco clara, o
+    cualquier caso donde tendrías que ADIVINAR la tabla/columna/medida en vez de deducirla con
+    confianza — NO inventes la más parecida ni fuerces un mapeo aproximado. Es mejor preguntar
+    que devolver datos de algo que el usuario no pidió. Responde NECESITA_ACLARACION.
   - Si el usuario pide un periodo del calendario real que cae FUERA del rango de
     datos (ver contexto temporal), responde EXACTAMENTE:
         FUERA_DE_RANGO: <periodo solicitado> | <rango disponible>
@@ -259,35 +422,19 @@ Tu tarea: interpretar el resultado de una consulta y responder al usuario.
 Devuelve SIEMPRE un objeto JSON válido con esta estructura exacta (sin markdown):
 {
   "text": "<respuesta en lenguaje natural>",
-  "chart_type": "<tipo>",
   "title": "<título corto en español para el gráfico, máx 50 chars>"
 }
 
 El campo "title" debe ser un título legible (en el mismo idioma indicado en el contexto)
-que describa lo que muestra el gráfico, basándote en la pregunta del usuario. Ejemplos:
+que describa lo que muestra el resultado, basándote en la pregunta del usuario. Ejemplos:
   pregunta "ventas de 2021 por tienda"       → "Ventas por tienda (2021)"
   pregunta "sales by store in 2021"          → "Sales by store (2021)"
   pregunta "distribución de ventas por categoría" → "Distribución de ventas por categoría"
   pregunta "evolución de ventas 2015 a 2020" → "Evolución de ventas (2015–2020)"
-Si no hay gráfico (chart_type "table" o "none"), pon title como cadena vacía "".
+Si el resultado es una tabla sin gráfico o hubo error, pon title como cadena vacía "".
 
-Valores permitidos para chart_type:
-  "kpi"   → resultado es un único número o métrica
-  "line"  → serie temporal (datos por fecha, mes, año, trimestre)
-  "bar"   → comparación entre categorías no temporales
-  "pie"   → distribución o proporciones entre pocas categorías
-  "table" → datos detallados, múltiples columnas, o el usuario no pidió gráfico
-  "none"  → error o sin datos
-
-Cómo elegir chart_type:
-  1. Si el usuario pidió explícitamente un tipo ("en barras", "circular", "quesito",
-     "evolución", "tendencia"...) → úsalo.
-  2. Si no especificó → infiere por la forma de los datos:
-       · 1 fila, 1 número                   → kpi
-       · columna temporal (año, mes, fecha)  → line
-       · pocas categorías + "distribución"   → pie
-       · múltiples filas/columnas            → table
-  3. Ante la duda → table.
+El tipo de visualización (tabla/gráfico y qué tipo) ya se decidió en un paso anterior del
+pipeline — tú NO decides eso, solo redactas texto y título.
 
 Reglas para text:
   - Usa ÚNICAMENTE los datos entregados; nunca inventes cifras.
@@ -300,20 +447,6 @@ Cuando el resultado viene VACÍO:
     rango hay disponible (usa las fechas del contexto temporal) y ofrece reformular.
   - Si el periodo SÍ está dentro del rango y no hay filas: indica que no hubo
     ventas para esos criterios."""
-
-ROL_SELECTOR_GRAFICO = """\
-Tu tarea: decidir qué tipo de visualización usar para mostrar un resultado de datos.
-El usuario puede pedir gráfico en español o en inglés.
-
-Responde SOLO con una de estas palabras, sin explicación ni puntuación:
-  kpi    → resultado es un único número
-  line   → serie temporal (datos por fecha, mes, año)
-  bar    → comparación entre categorías (por defecto si pide "gráfico" sin especificar tipo)
-  pie    → distribución, proporciones o porcentajes entre pocas categorías
-
-Regla importante: si el usuario pide "un gráfico", "a chart", "a graphic", "visualize",
-"create a chart" sin especificar tipo → devuelve "bar" (nunca "table").
-Solo devuelve "table" si el usuario lo pide explícitamente."""
 
 ROL_CONVERSACION = """\
 Tu tarea: atender mensajes conversacionales (saludos, agradecimientos, dudas sobre

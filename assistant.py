@@ -18,7 +18,7 @@ import pandas as pd
 from openai import OpenAI
 
 from system_context import construir_system, ROL_ENRUTADOR, ROL_GENERADOR, \
-    ROL_CORRECTOR, ROL_REDACTOR, ROL_CONVERSACION, ROL_SELECTOR_GRAFICO, \
+    ROL_CORRECTOR, ROL_REDACTOR, ROL_CONVERSACION, ROL_DECISOR_VISUALIZACION, \
     ROL_IDENTIFICADOR_FILTRO
 
 # --- Configuración -------------------------------------------------------
@@ -108,6 +108,23 @@ def _chat(system: str, user: str) -> str:
     return resp.choices[0].message.content.strip()
 
 
+def _chat_json(system: str, user: str, json_schema: dict, schema_name: str) -> dict:
+    """Como _chat(), pero fuerza structured output (JSON Schema strict) — sin parseo regex."""
+    resp = cliente.chat.completions.create(
+        model=MODELO_LLM,
+        temperature=0,
+        messages=[
+            {"role": "system", "content": system},
+            {"role": "user", "content": user},
+        ],
+        response_format={
+            "type": "json_schema",
+            "json_schema": {"name": schema_name, "schema": json_schema, "strict": True},
+        },
+    )
+    return _json_stdlib.loads(resp.choices[0].message.content)
+
+
 def _limpiar_dax(texto: str) -> str:
     return texto.replace("```DAX", "").replace("```dax", "").replace("```", "").strip()
 
@@ -155,18 +172,119 @@ def enrutar(pregunta: str) -> str:
     return categoria if categoria in validas else "CONSULTA"
 
 
+# --- Capa 1.5: decisión de visualización ---------------------------------
+
+_DECISION_VISUALIZACION_SCHEMA = {
+    "type": "object",
+    "additionalProperties": False,
+    "required": [
+        "modo", "chart_type", "eje_x", "columna_serie",
+        "medida_1", "medida_2", "mostrar_tendencia",
+        "necesita_aclaracion", "tipo_aclaracion",
+        "pregunta_aclaracion", "opciones_aclaracion",
+        "titulo_sugerido",
+    ],
+    "properties": {
+        "modo": {"type": "string", "enum": ["tabla", "grafico"]},
+        "chart_type": {"type": "string", "enum": [
+            "table", "kpi", "bar", "line", "pie", "area",
+            "multi_line", "grouped_bar", "stacked_bar", "combo",
+        ]},
+        "eje_x": {"type": ["string", "null"]},
+        "columna_serie": {"type": ["string", "null"]},
+        "medida_1": {"type": "string"},
+        "medida_2": {"type": ["string", "null"]},
+        "mostrar_tendencia": {"type": "boolean"},
+        "necesita_aclaracion": {"type": "boolean"},
+        "tipo_aclaracion": {"type": ["string", "null"], "enum": ["texto", "visual", None]},
+        "pregunta_aclaracion": {"type": ["string", "null"]},
+        "opciones_aclaracion": {
+            "type": ["array", "null"],
+            "items": {
+                "type": "object",
+                "additionalProperties": False,
+                "required": ["id", "label", "campo", "valor"],
+                "properties": {
+                    "id": {"type": "string"},
+                    "label": {"type": "string"},
+                    "campo": {"type": "string", "enum": ["chart_type", "eje_x", "columna_serie"]},
+                    "valor": {"type": "string"},
+                },
+            },
+        },
+        "titulo_sugerido": {"type": "string"},
+    },
+}
+
+_DECISION_DEFAULT = {
+    "modo": "tabla", "chart_type": "table", "eje_x": None, "columna_serie": None,
+    "medida_1": "Ventas", "medida_2": None, "mostrar_tendencia": False,
+    "necesita_aclaracion": False,
+    "tipo_aclaracion": None, "pregunta_aclaracion": None, "opciones_aclaracion": None,
+    "titulo_sugerido": "",
+}
+
+
+def decidir_visualizacion(pregunta: str, historial: list | None = None,
+                          idioma: str = "español",
+                          columnas_disponibles: list[str] | None = None) -> dict:
+    """Decide modo/tipo de gráfico y columnas ANTES de generar el DAX."""
+    system = construir_system(ROL_DECISOR_VISUALIZACION, incluir_esquema=True, idioma=idioma)
+    contexto = (historial or [])[-5:]
+    extra = ""
+    if columnas_disponibles:
+        extra = (f"\nColumnas YA disponibles de una consulta anterior (sin volver a consultar "
+                 f"Power BI si tu decisión puede satisfacerse solo con ellas): {columnas_disponibles}")
+    user = f"""Contexto reciente de consultas:
+{contexto}
+
+Pregunta actual:
+{pregunta}{extra}
+
+Decide la visualización."""
+    try:
+        return _chat_json(system, user, _DECISION_VISUALIZACION_SCHEMA, "decision_visualizacion")
+    except Exception:
+        return dict(_DECISION_DEFAULT)
+
+
+def _render_forma_requerida(decision: dict) -> str:
+    if decision.get("modo") == "tabla" or decision.get("chart_type") == "table":
+        return ("Resultado esperado: tabla/listado. No hay una forma de datos concreta que "
+                "respetar — genera el DAX que responda directamente a la pregunta.")
+    ct = decision.get("chart_type")
+    lineas = [f"Forma de datos requerida (chart_type={ct}):",
+              f"  - Eje X / categoría: {decision.get('eje_x') or '(ninguno, resultado de una sola fila)'}"]
+    if decision.get("columna_serie"):
+        lineas.append(f"  - Columna de serie: {decision['columna_serie']}")
+        lineas.append("  - Genera el DAX en FORMATO LARGO: una fila por cada combinación de "
+                      "(eje_x, columna_serie), con la medida como única columna numérica. "
+                      "Añade columna_serie como SEGUNDA columna de agrupación en "
+                      "SUMMARIZECOLUMNS (después del eje_x), NUNCA como filtro. "
+                      "ORDER BY eje_x ASC, columna_serie ASC. No pivotes series a columnas.")
+    lineas.append(f"  - Medida 1: {decision.get('medida_1')} "
+                  f"(usa este nombre EXACTO como alias de columna proyectada)")
+    if decision.get("medida_2"):
+        lineas.append(f"  - Medida 2 (misma fila que medida 1, NO formato largo): "
+                      f"{decision['medida_2']} (alias exacto: \"{decision['medida_2']}\")")
+    return "\n".join(lineas)
+
+
 # --- Capa 2: generación --------------------------------------------------
 
-def generar_dax(pregunta: str, historial: list | None = None, idioma: str = "español") -> str:
+def generar_dax(pregunta: str, decision: dict, historial: list | None = None,
+                idioma: str = "español") -> str:
     system = construir_system(ROL_GENERADOR, incluir_esquema=True, incluir_tiempo=True, idioma=idioma)
     contexto = (historial or [])[-5:]
     user = f"""Contexto reciente de consultas:
 {contexto}
 
+{_render_forma_requerida(decision)}
+
 Pregunta actual:
 {pregunta}
 
-Genera la consulta DAX considerando el contexto."""
+Genera la consulta DAX considerando el contexto y la forma de datos requerida."""
     return _parchear_dax(_limpiar_dax(_chat(system, user)))
 
 
@@ -177,6 +295,17 @@ import subprocess, json as _json, pathlib as _pathlib, platform as _platform
 _ADOMD_DIR = _pathlib.Path(__file__).parent / "adomd_bin"
 _ADOMD_BIN = _ADOMD_DIR / "adomd_wrapper"
 _ADOMD_DLL = _ADOMD_DIR / "adomd_wrapper.dll"
+
+def _limpiar_columna(c: str) -> str:
+    """'Calendar[Año#Mes]', \"[Calendar].[Año#Mes]\" o 'Ventas' -> 'Año#Mes' / 'Ventas'.
+
+    ADOMD/REST devuelven columnas físicas como 'Tabla[Columna]' (sin corchetes en la
+    tabla); las medidas con alias de SUMMARIZECOLUMNS llegan tal cual, sin corchetes.
+    """
+    if "[" not in c:
+        return c
+    return c[c.rfind("[") + 1:].rstrip("]")
+
 
 def ejecutar_dax(dax: str):
     """Ejecuta DAX contra Power BI. Usa ADOMD.NET si está disponible, REST API si no."""
@@ -195,7 +324,7 @@ def _ejecutar_dax_adomd(dax: str):
             return pd.DataFrame(), result.stderr.strip()
         rows = _json.loads(result.stdout)
         df = pd.DataFrame(rows)
-        df.columns = [c.split("].[")[-1].rstrip("]").lstrip("[") if "]" in c else c for c in df.columns]
+        df.columns = [_limpiar_columna(c) for c in df.columns]
         return df, None
     except Exception as e:
         return pd.DataFrame(), str(e)
@@ -214,7 +343,7 @@ def _ejecutar_dax_rest(dax: str):
         rows = r.json()["results"][0]["tables"][0].get("rows", [])
         df = pd.DataFrame(rows)
         if not df.empty:
-            df.columns = [c.split("].[")[-1].rstrip("]").lstrip("[") if "]" in c else c for c in df.columns]
+            df.columns = [_limpiar_columna(c) for c in df.columns]
         return df, None
     except Exception as e:
         return pd.DataFrame(), str(e)
@@ -240,9 +369,20 @@ Genera el DAX corregido."""
 
 # --- Capa 5: respuesta ---------------------------------------------------
 
+_RESPUESTA_DATOS_SCHEMA = {
+    "type": "object",
+    "additionalProperties": False,
+    "required": ["text", "title"],
+    "properties": {
+        "text": {"type": "string"},
+        "title": {"type": "string"},
+    },
+}
+
+
 def responder_datos(pregunta: str, dax: str, df: pd.DataFrame,
-                    error: str | None, idioma: str = "español") -> tuple[str, str, str]:
-    """Devuelve (texto_respuesta, chart_type, title). El LLM decide tipo y título."""
+                    error: str | None, idioma: str = "español") -> tuple[str, str]:
+    """Devuelve (texto_respuesta, title). El tipo de visualización ya se decidió antes."""
     system = construir_system(ROL_REDACTOR, incluir_tiempo=True, idioma=idioma)
     vacio = (not error) and df.empty
     FILAS_MAX_CONTEXTO = 50
@@ -261,46 +401,40 @@ Resultado de la consulta:
 {datos}
 
 Responde en JSON."""
-    raw = _chat(system, user)
     try:
-        limpio = re.sub(r"^```(?:json)?\s*|\s*```$", "", raw.strip(), flags=re.MULTILINE)
-        parsed = _json_stdlib.loads(limpio)
-        text = parsed.get("text", raw)
-        chart_type = parsed.get("chart_type", "table")
-        title = parsed.get("title", "")
+        parsed = _chat_json(system, user, _RESPUESTA_DATOS_SCHEMA, "respuesta_datos")
+        return parsed.get("text", ""), parsed.get("title", "")
     except Exception:
-        text_match = re.search(r'"text"\s*:\s*"((?:[^"\\]|\\.)*)"', raw, re.DOTALL)
-        chart_match = re.search(r'"chart_type"\s*:\s*"(\w+)"', raw)
-        title_match = re.search(r'"title"\s*:\s*"((?:[^"\\]|\\.)*)"', raw)
-        text = text_match.group(1).replace('\\"', '"').replace('\\n', '\n') if text_match else raw
-        chart_type = chart_match.group(1) if chart_match else "table"
-        title = title_match.group(1) if title_match else ""
-    validos = {"kpi", "bar", "line", "pie", "table", "none"}
-    return text, (chart_type if chart_type in validos else "table"), title
+        fallback = ("Sorry, I couldn't process the response." if idioma == "inglés"
+                    else "Lo siento, no he podido procesar la respuesta.")
+        return fallback, ""
 
 
-def decidir_tipo_grafico(peticion: str, columnas: list) -> str:
-    """Decide el tipo de visualización para redibujar el resultado anterior."""
-    system = construir_system(ROL_SELECTOR_GRAFICO)
-    user = f"""El usuario pide: "{peticion}"
-Las columnas del resultado son: {columnas}"""
-    resultado = _chat(system, user).strip().lower()
-    validos = {"kpi", "bar", "line", "pie", "table"}
-    return resultado if resultado in validos else "bar"
+_FILTRO_SCHEMA = {
+    "type": "object",
+    "additionalProperties": False,
+    "required": ["tabla", "columna", "titulo", "dax"],
+    "properties": {
+        "tabla": {"type": "string"},
+        "columna": {"type": "string"},
+        "titulo": {"type": "string"},
+        "dax": {"type": "string"},
+    },
+}
+
+_FILTRO_DEFAULT = {
+    "tabla": "Stores", "columna": "Store Name", "titulo": "Tiendas",
+    "dax": "EVALUATE DISTINCT('Stores'[Store Name])",
+}
 
 
 def identificar_columna_filtro(pregunta: str, idioma: str = "español") -> dict:
     """Identifica la tabla/columna para un filtro y genera el DAX DISTINCT."""
     system = construir_system(ROL_IDENTIFICADOR_FILTRO, incluir_esquema=True, idioma=idioma)
-    raw = _chat(system, pregunta)
     try:
-        limpio = re.sub(r'^```(?:json)?\s*|\s*```$', '', raw.strip(), flags=re.MULTILINE)
-        return _json_stdlib.loads(limpio)
+        return _chat_json(system, pregunta, _FILTRO_SCHEMA, "filtro_columna")
     except Exception:
-        return {
-            "tabla": "Stores", "columna": "Store Name", "titulo": "Tiendas",
-            "dax": "EVALUATE DISTINCT('Stores'[Store Name])"
-        }
+        return dict(_FILTRO_DEFAULT)
 
 
 def responder_conversacion(pregunta: str, idioma: str = "español") -> str:

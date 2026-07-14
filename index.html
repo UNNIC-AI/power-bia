@@ -349,6 +349,25 @@
       font-family: var(--font-ui);
     }
 
+    .export-pdf-btn {
+      margin-left: auto;
+      display: none;
+      align-items: center;
+      gap: 5px;
+      background: none;
+      border: 1px solid var(--border-2);
+      color: var(--text-2);
+      border-radius: 5px;
+      padding: 5px 10px;
+      font-family: var(--font-ui);
+      font-size: 11.5px;
+      cursor: pointer;
+      transition: border-color 0.12s, color 0.12s;
+      flex-shrink: 0;
+    }
+    .export-pdf-btn:hover { border-color: var(--accent); color: var(--accent); }
+    .print-header { display: none; }
+
     .chat-bar-title.empty {
       color: var(--text-3);
       font-weight: 400;
@@ -614,6 +633,12 @@
     .card-kind-line  { color: var(--green);  border-color: rgba(0,229,160,0.35); }
     .card-kind-pie   { color: #A78BFA;       border-color: rgba(167,139,250,0.35); }
     .card-kind-table { color: var(--text-2); border-color: var(--border-2); }
+    .card-kind-area,
+    .card-kind-multi_line   { color: var(--green); border-color: rgba(0,229,160,0.35); }
+    .card-kind-grouped_bar,
+    .card-kind-stacked_bar  { color: #60A5FA;  border-color: rgba(96,165,250,0.35); }
+    .card-kind-combo        { color: #2DD4BF;  border-color: rgba(45,212,191,0.35); }
+    .card-kind-choice       { color: var(--text-2); border-color: var(--border-2); }
 
     .card-title { font-size: 12.5px; font-weight: 500; color: var(--text); font-family: var(--font-ui); }
     .card-sub   { font-size: 11px; color: var(--text-3); font-family: var(--font-data); }
@@ -707,6 +732,10 @@
     .chart-svg { width: 100%; max-width: 680px; height: auto; display: block; margin: 0 auto; }
     .chart-scroll { overflow-x: auto; overflow-y: hidden; }
     .chart-scroll .chart-svg { max-width: none; width: auto; }
+
+    .chart-legend { display: flex; flex-wrap: wrap; gap: 8px 16px; justify-content: center; margin-top: 8px; }
+    .legend-item { display: flex; align-items: center; gap: 6px; font-size: 10.5px; font-family: var(--font-data); color: var(--text-3); }
+    .legend-dot  { width: 8px; height: 8px; border-radius: 2px; flex-shrink: 0; }
 
     /* ── Sidebar nav ────────────────────────────── */
     .sidebar-nav {
@@ -949,6 +978,39 @@
     .widget-body .chart-svg { max-width: 100%; width: 100%; }
     .widget-body table.dt { font-size: 10px; }
     .widget-rsz svg { display: block; }
+
+    @media print {
+      html, body {
+        background: #fff !important; height: auto !important; overflow: visible !important;
+        display: block !important;
+      }
+      .sidebar, .chat-bar, .dataset-strip, .views-input-area, .filter-legend,
+      #chart-tip, .widget-del, .widget-edit-btn, .widget-pin-btn, .widget-rsz {
+        display: none !important;
+      }
+      .main { height: auto !important; overflow: visible !important; display: block !important; }
+      #views-area {
+        display: block !important; height: auto !important; overflow: visible !important;
+      }
+      .views-canvas { overflow: visible !important; height: auto !important; flex: none !important; }
+      .views-canvas-inner {
+        position: static !important; height: auto !important;
+        background-image: none !important;
+      }
+      .print-header {
+        display: block !important; font-family: var(--font-ui); font-size: 20px;
+        font-weight: 600; color: #111; margin: 0 0 18px;
+      }
+      .widget {
+        position: static !important; left: auto !important; top: auto !important;
+        width: 100% !important; height: auto !important; min-height: 260px;
+        margin-bottom: 22px; box-shadow: none !important; border: 1px solid #ccc !important;
+        background: #fff !important; break-inside: avoid;
+      }
+      .widget-hdr { border-bottom: 1px solid #ccc !important; }
+      .widget-kind, .widget-title { color: #111 !important; }
+      .widget-body { color: #111; }
+    }
     /* Filter widget */
     .filter-body { display:flex; flex-direction:column; height:100%; overflow:hidden; }
     .filter-search-row { padding:6px 8px 5px; border-bottom:1px solid var(--border); flex-shrink:0; display:flex; gap:4px; }
@@ -1084,7 +1146,7 @@
       box-shadow: 0 4px 16px rgba(0,0,0,0.5);
     }
     #chart-tip .tip-label { color: #8BA3BF; font-size: 10.5px; margin-bottom: 2px; }
-    #chart-tip .tip-val   { color: #F5A623; font-weight: 700; font-size: 13px; }
+    #chart-tip .tip-val   { color: #F5A623; font-weight: 700; font-size: 13px; white-space: pre-line; }
 
     /* DAX toggle */
     .dax-toggle {
@@ -1596,6 +1658,10 @@
   <div class="chat-bar">
     <div class="status-pip dim" id="status-pip"></div>
     <span class="chat-bar-title empty" id="bar-title">// Selecciona o inicia una consulta</span>
+    <button class="export-pdf-btn" id="export-pdf-btn" onclick="exportViewPDF()" title="Exportar esta vista a PDF">
+      <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 1v7M3 5l3 3 3-3"/><path d="M2 10h8"/></svg>
+      Exportar PDF
+    </button>
   </div>
 
   <div class="dataset-strip">
@@ -1681,6 +1747,7 @@
 
   <div id="views-area">
     <div class="views-canvas">
+      <div class="print-header" id="print-header"></div>
       <div class="views-canvas-inner" id="views-canvas"></div>
     </div>
     <div class="filter-legend" id="filter-legend">
@@ -1768,7 +1835,7 @@ const _tipVal   = document.getElementById('tip-val');
 
 function tipShow(e, label, val) {
   _tipLabel.textContent = label;
-  _tipVal.textContent   = val;
+  _tipVal.textContent   = Array.isArray(val) ? val.join('\n') : val;
   _tip.style.display = 'block';
   tipMove(e);
 }
@@ -1784,7 +1851,12 @@ let convs = [];
 let activeId = null;
 const _pendingConvs = new Set();  // convIds with unread responses
 
-try { convs = JSON.parse(localStorage.getItem('pbia_convs') || '[]'); } catch(e) {}
+async function fetchConversations() {
+  try {
+    const r = await fetch('/api/conversations');
+    convs = r.ok ? await r.json() : [];
+  } catch (e) { convs = []; }
+}
 
 // ── Theme ──────────────────────────────────────────────────────────────────
 const MOON_ICON = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>`;
@@ -1838,7 +1910,7 @@ function applyLang(lang) {
 }
 
 // ── Boot ───────────────────────────────────────────────────────────────────
-(function init() {
+(async function init() {
   const saved = localStorage.getItem('pbia_theme')
     || (window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
   applyTheme(saved);
@@ -1853,6 +1925,7 @@ function applyLang(lang) {
       savedName.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
   }
 
+  await fetchConversations();
   paintSidebar();
   if (convs.length) loadConv(convs[0].id);
 })();
@@ -1861,7 +1934,7 @@ function applyLang(lang) {
 function newConversation() {
   const id = 'c' + Date.now();
   convs.unshift({ id, title: 'Nueva consulta', msgs: [], ts: Date.now() });
-  persist();
+  persistConv(id);
   loadConv(id);
 }
 
@@ -1890,12 +1963,14 @@ function loadConv(id) {
   paintSidebar();
 }
 
-function persist() {
-  try {
-    localStorage.setItem('pbia_convs', JSON.stringify(
-      convs.map(c => ({ ...c, msgs: c.msgs.slice(-50) }))
-    ));
-  } catch(e) {}
+function persistConv(convId) {
+  const c = convs.find(x => x.id === convId);
+  if (!c) return;
+  fetch('/api/conversations/' + convId, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ title: c.title, msgs: c.msgs.slice(-50), ts: c.ts }),
+  }).catch(() => {});
 }
 
 function active() { return convs.find(c => c.id === activeId) || null; }
@@ -1911,7 +1986,7 @@ function pushTo(convId, msg) {
     if (activeId === convId) document.getElementById('bar-title').textContent = c.title;
     paintSidebar();
   }
-  persist();
+  persistConv(convId);
 }
 
 // ── Sidebar ────────────────────────────────────────────────────────────────
@@ -1968,7 +2043,7 @@ function paintSidebar() {
 
 function deleteConv(id) {
   convs = convs.filter(c => c.id !== id);
-  persist();
+  fetch('/api/conversations/' + id, { method: 'DELETE' }).catch(() => {});
   if (activeId === id) {
     activeId = null;
     if (convs.length) {
@@ -2109,7 +2184,11 @@ function mkTyping() {
 
 // ── Cards ──────────────────────────────────────────────────────────────────
 function mkCard(card) {
-  const kinds = { kpi: 'KPI', bar: 'Barras', line: 'Línea', table: 'Tabla', pie: 'Distribución' };
+  const kinds = {
+    kpi: 'KPI', bar: 'Barras', line: 'Línea', table: 'Tabla', pie: 'Distribución',
+    area: 'Área', multi_line: 'Líneas', grouped_bar: 'Barras agrupadas',
+    stacked_bar: 'Barras apiladas', combo: 'Combinado', choice: 'Elige',
+  };
   const el = document.createElement('div');
   el.className = 'card';
 
@@ -2126,11 +2205,17 @@ function mkCard(card) {
   body.className = card.kind === 'kpi' ? 'card-body kpi-body' : 'card-body';
 
   switch (card.kind) {
-    case 'kpi':   body.appendChild(mkKPI(card));       break;
-    case 'bar':   body.appendChild(mkBarChart(card));  break;
-    case 'line':  body.appendChild(mkLineChart(card)); break;
-    case 'table': body.appendChild(mkTable(card));     break;
-    case 'pie':   body.appendChild(mkPieChart(card));  break;
+    case 'kpi':         body.appendChild(mkKPI(card));                       break;
+    case 'bar':         body.appendChild(mkBarChart(card));                  break;
+    case 'line':
+    case 'area':        body.appendChild(mkLineChart(card));                 break;
+    case 'table':       body.appendChild(mkTable(card));                     break;
+    case 'pie':         body.appendChild(mkPieChart(card));                  break;
+    case 'multi_line':  body.appendChild(mkLineChart(card));                 break;
+    case 'grouped_bar':  body.appendChild(mkGroupedStackedBar(card, false));  break;
+    case 'stacked_bar':  body.appendChild(mkGroupedStackedBar(card, true));   break;
+    case 'combo':        body.appendChild(mkComboChart(card));               break;
+    case 'choice':       body.appendChild(mkChoiceCard(card));               break;
   }
 
   el.appendChild(body);
@@ -2443,16 +2528,17 @@ function mkPieChart(card) {
 }
 
 function mkLineChart(card) {
-  const data = card.data || [];
-  if (!data.length) return document.createElement('div');
+  const series = (card.series && card.series.length) ? card.series : [{ name: null, data: card.data || [] }];
+  const nonEmpty = series.filter(s => s.data && s.data.length);
+  if (!nonEmpty.length) return document.createElement('div');
 
-  const n = data.length;
+  const n = Math.max(...nonEmpty.map(s => s.data.length));
   const W = Math.max(520, n * 8), H = 320;
   const pL = 62, pR = 40, pT = 18, pB = 50;
   const pW = W - pL - pR, pH = H - pT - pB;
-  const vals = data.map(d => d.value);
-  const max = Math.max(...vals) * 1.12 || 1;
-  const min = Math.min(...vals, 0) * 0.9;
+  const allVals = nonEmpty.flatMap(s => s.data.map(d => d.value));
+  const max = Math.max(...allVals) * 1.12 || 1;
+  const min = Math.min(...allVals, 0) * 0.9;
   const rng = (max - min) || 1;
   const X = i => pL + pW * (n === 1 ? 0.5 : i / (n - 1));
   const Y = v => pT + pH - ((v - min) / rng) * pH;
@@ -2463,16 +2549,8 @@ function mkLineChart(card) {
   svg.setAttribute('width', W);
   svg.setAttribute('class', 'chart-svg');
 
-  const gid = 'g' + Math.abs(Math.sin(data.length * 7919) * 1e6 | 0).toString(36);
+  const cid = 'lc' + (++_chartSeq);
   const defs = document.createElementNS(ns, 'defs');
-  const grad = document.createElementNS(ns, 'linearGradient');
-  setA(grad, { id: gid, x1: 0, y1: 0, x2: 0, y2: 1 });
-  const s1 = document.createElementNS(ns, 'stop');
-  setA(s1, { offset: '0%', 'stop-color': '#00C8FF', 'stop-opacity': 0.18 });
-  const s2 = document.createElementNS(ns, 'stop');
-  setA(s2, { offset: '100%', 'stop-color': '#00C8FF', 'stop-opacity': 0 });
-  grad.appendChild(s1); grad.appendChild(s2);
-  defs.appendChild(grad);
   svg.appendChild(defs);
 
   for (let i = 0; i <= 4; i++) {
@@ -2487,48 +2565,316 @@ function mkLineChart(card) {
     svg.appendChild(tx);
   }
 
-  let dL = '';
-  data.forEach((d, i) => { dL += (i ? 'L' : 'M') + X(i) + ' ' + Y(d.value) + ' '; });
-  const dA = dL + `L${X(n-1)} ${pT + pH} L${X(0)} ${pT + pH} Z`;
+  nonEmpty.forEach((s, si) => {
+    const col = COLORS[si % COLORS.length];
+    const data = s.data;
+    let dL = '';
+    data.forEach((d, i) => { dL += (i ? 'L' : 'M') + X(i) + ' ' + Y(d.value) + ' '; });
 
-  const area = document.createElementNS(ns, 'path');
-  setA(area, { d: dA, fill: `url(#${gid})` });
-  svg.appendChild(area);
+    // Relleno de área bajo la curva: solo con una serie (con varias, ensucia el gráfico).
+    if (nonEmpty.length === 1) {
+      const gid = `${cid}_g0`;
+      const grad = document.createElementNS(ns, 'linearGradient');
+      setA(grad, { id: gid, x1: 0, y1: 0, x2: 0, y2: 1 });
+      const gs1 = document.createElementNS(ns, 'stop');
+      setA(gs1, { offset: '0%', 'stop-color': col, 'stop-opacity': 0.18 });
+      const gs2 = document.createElementNS(ns, 'stop');
+      setA(gs2, { offset: '100%', 'stop-color': col, 'stop-opacity': 0 });
+      grad.appendChild(gs1); grad.appendChild(gs2);
+      defs.appendChild(grad);
 
-  const line = document.createElementNS(ns, 'path');
-  setA(line, { d: dL, fill: 'none', stroke: '#00C8FF', 'stroke-width': 2.2, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' });
-  svg.appendChild(line);
-
-  const every = Math.ceil(n / 8);
-  data.forEach((d, i) => {
-    const x = X(i), y = Y(d.value);
-    const dot = document.createElementNS(ns, 'circle');
-    setA(dot, { cx: x, cy: y, r: 3, fill: '#111827', stroke: '#00C8FF', 'stroke-width': 1.8 });
-    svg.appendChild(dot);
-
-    // Hit area invisible para hover
-    const hit = document.createElementNS(ns, 'circle');
-    setA(hit, { cx: x, cy: y, r: 14, fill: 'transparent', style: 'cursor:pointer' });
-    hit.addEventListener('mousemove', e => tipShow(e, String(d.label), fmtNum(d.value)));
-    hit.addEventListener('mouseleave', tipHide);
-    svg.appendChild(hit);
-
-    if (i % every === 0 || i === n - 1) {
-      const tx = document.createElementNS(ns, 'text');
-      setA(tx, { x, y: H - pB + 16, 'text-anchor': 'middle', 'font-size': 10, 'font-family': 'JetBrains Mono,monospace', fill: '#334460' });
-      const l = String(d.label);
-      tx.textContent = l.length > 8 ? l.slice(0, 7) + '…' : l;
-      svg.appendChild(tx);
+      const dA = dL + `L${X(data.length - 1)} ${pT + pH} L${X(0)} ${pT + pH} Z`;
+      const area = document.createElementNS(ns, 'path');
+      setA(area, { d: dA, fill: `url(#${gid})` });
+      svg.appendChild(area);
     }
+
+    const line = document.createElementNS(ns, 'path');
+    setA(line, { d: dL, fill: 'none', stroke: col, 'stroke-width': 2.2, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' });
+    svg.appendChild(line);
+
+    const every = Math.ceil(data.length / 8);
+    data.forEach((d, i) => {
+      const x = X(i), y = Y(d.value);
+      const dot = document.createElementNS(ns, 'circle');
+      setA(dot, { cx: x, cy: y, r: 3, fill: '#111827', stroke: col, 'stroke-width': 1.8 });
+      svg.appendChild(dot);
+
+      // Hit area invisible para hover
+      const hit = document.createElementNS(ns, 'circle');
+      setA(hit, { cx: x, cy: y, r: 14, fill: 'transparent', style: 'cursor:pointer' });
+      const tipTxt = s.name ? `${s.name}: ${fmtNum(d.value)}` : fmtNum(d.value);
+      hit.addEventListener('mousemove', e => tipShow(e, String(d.label), tipTxt));
+      hit.addEventListener('mouseleave', tipHide);
+      svg.appendChild(hit);
+
+      if (si === 0 && (i === data.length - 1 || (i % every === 0 && data.length - 1 - i >= every))) {
+        const tx = document.createElementNS(ns, 'text');
+        setA(tx, { x, y: H - pB + 16, 'text-anchor': 'middle', 'font-size': 10, 'font-family': 'JetBrains Mono,monospace', fill: '#334460' });
+        const l = String(d.label);
+        tx.textContent = l.length > 8 ? l.slice(0, 7) + '…' : l;
+        svg.appendChild(tx);
+      }
+    });
   });
 
-  if (n > 48) {
-    const wrap = document.createElement('div');
-    wrap.className = 'chart-scroll';
-    wrap.appendChild(svg);
-    return wrap;
+  // Línea de tendencia (regresión lineal): solo tiene sentido con una única serie.
+  if (card.trend && nonEmpty.length === 1) {
+    const data = nonEmpty[0].data;
+    const xs = data.map((_, i) => i);
+    const ys = data.map(d => d.value);
+    const xMean = xs.reduce((a, b) => a + b, 0) / n;
+    const yMean = ys.reduce((a, b) => a + b, 0) / n;
+    let num = 0, den = 0;
+    for (let i = 0; i < n; i++) { num += (xs[i] - xMean) * (ys[i] - yMean); den += (xs[i] - xMean) ** 2; }
+    const slope = den ? num / den : 0;
+    const intercept = yMean - slope * xMean;
+    const trendLine = document.createElementNS(ns, 'line');
+    setA(trendLine, {
+      x1: X(0), y1: Y(intercept), x2: X(n - 1), y2: Y(intercept + slope * (n - 1)),
+      stroke: '#f59e0b', 'stroke-width': 1.8, 'stroke-dasharray': '6 4',
+    });
+    svg.appendChild(trendLine);
   }
-  return svg;
+
+  const wrap = n > 48 ? (() => {
+    const w = document.createElement('div');
+    w.className = 'chart-scroll';
+    w.appendChild(svg);
+    return w;
+  })() : svg;
+
+  if (nonEmpty.length <= 1) return wrap;
+
+  const container = document.createElement('div');
+  container.appendChild(wrap);
+  container.appendChild(mkLegend(nonEmpty));
+  return container;
+}
+
+function mkLegend(series) {
+  const legend = document.createElement('div');
+  legend.className = 'chart-legend';
+  series.forEach((s, i) => {
+    const item = document.createElement('div');
+    item.className = 'legend-item';
+    const dot = document.createElement('span');
+    dot.className = 'legend-dot';
+    dot.style.background = COLORS[i % COLORS.length];
+    item.appendChild(dot);
+    const label = document.createElement('span');
+    label.textContent = s.name || '';
+    item.appendChild(label);
+    legend.appendChild(item);
+  });
+  return legend;
+}
+
+function mkGroupedStackedBar(card, stacked) {
+  const series = (card.series && card.series.length) ? card.series : [{ name: null, data: card.data || [] }];
+  const nonEmpty = series.filter(s => s.data && s.data.length);
+  if (!nonEmpty.length) return document.createElement('div');
+
+  const labels = nonEmpty[0].data.map(d => d.label);
+  const n = labels.length;
+  const k = nonEmpty.length;
+  const maxLblLen = Math.max(...labels.map(l => String(l).length));
+  const rotateLabels = maxLblLen > 7 || n > 8;
+
+  const W = 560, H = 340;
+  const pL = 62, pR = 18, pT = 18;
+  const pB = rotateLabels ? 90 : 50;
+  const pW = W - pL - pR, pH = H - pT - pB;
+  const step = pW / n;
+
+  const max = stacked
+    ? Math.max(...labels.map((_, i) => nonEmpty.reduce((sum, s) => sum + (s.data[i] ? s.data[i].value : 0), 0))) * 1.15 || 1
+    : Math.max(...nonEmpty.flatMap(s => s.data.map(d => d.value))) * 1.15 || 1;
+
+  const groupW = Math.min(46, step * 0.72);
+  const barW = stacked ? groupW : groupW / k;
+
+  const ns = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(ns, 'svg');
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  svg.setAttribute('width', W);
+  svg.setAttribute('class', 'chart-svg');
+
+  for (let i = 0; i <= 4; i++) {
+    const val = max * i / 4;
+    const y = pT + pH - (val / max) * pH;
+    const ln = document.createElementNS(ns, 'line');
+    setA(ln, { x1: pL, y1: y, x2: W - pR, y2: y, stroke: i === 0 ? '#223352' : '#172034', 'stroke-width': 1 });
+    svg.appendChild(ln);
+    const tx = document.createElementNS(ns, 'text');
+    setA(tx, { x: pL - 7, y: y + 4, 'text-anchor': 'end', 'font-size': 10, 'font-family': 'JetBrains Mono,monospace', fill: '#334460' });
+    tx.textContent = fmtNum(Math.round(val));
+    svg.appendChild(tx);
+  }
+
+  labels.forEach((lbl, i) => {
+    const cx = pL + step * i + step / 2;
+    let yOffset = 0;
+
+    nonEmpty.forEach((s, si) => {
+      const v = s.data[i] ? s.data[i].value : 0;
+      const bh = Math.max(v > 0 ? 2 : 0, (v / max) * pH);
+      const col = COLORS[si % COLORS.length];
+      let x;
+      if (stacked) {
+        x = cx - barW / 2;
+      } else {
+        x = cx - groupW / 2 + si * barW;
+      }
+      const y = stacked ? (pT + pH - yOffset - bh) : (pT + pH - bh);
+
+      const rect = document.createElementNS(ns, 'rect');
+      setA(rect, { x, y, width: barW, height: bh, rx: 2, fill: col, opacity: 0.9, style: 'cursor:pointer' });
+      const tipTxt = s.name ? `${s.name}: ${fmtNum(v)}` : fmtNum(v);
+      rect.addEventListener('mousemove', e => tipShow(e, String(lbl), tipTxt));
+      rect.addEventListener('mouseleave', tipHide);
+      svg.appendChild(rect);
+
+      if (stacked) yOffset += bh;
+    });
+
+    const xl = document.createElementNS(ns, 'text');
+    const lblStr = String(lbl);
+    if (rotateLabels) {
+      const ty = pT + pH + 8;
+      setA(xl, { x: cx, y: ty, 'text-anchor': 'end', 'font-size': 10, 'font-family': 'JetBrains Mono,monospace', fill: '#334460', transform: `rotate(-40 ${cx} ${ty})` });
+      xl.textContent = lblStr.length > 18 ? lblStr.slice(0, 17) + '…' : lblStr;
+    } else {
+      setA(xl, { x: cx, y: pT + pH + 16, 'text-anchor': 'middle', 'font-size': 10, 'font-family': 'JetBrains Mono,monospace', fill: '#334460' });
+      xl.textContent = lblStr;
+    }
+    svg.appendChild(xl);
+  });
+
+  if (k <= 1) return svg;
+  const container = document.createElement('div');
+  container.appendChild(svg);
+  container.appendChild(mkLegend(nonEmpty));
+  return container;
+}
+
+function mkComboChart(card) {
+  const series = card.series || [];
+  const barSerie = series.find(s => s.type === 'bar') || series[0];
+  const lineSerie = series.find(s => s.type === 'line') || series[1];
+  if (!barSerie || !lineSerie || !barSerie.data.length) return document.createElement('div');
+
+  const labels = barSerie.data.map(d => d.label);
+  const n = labels.length;
+  const maxLblLen = Math.max(...labels.map(l => String(l).length));
+  const rotateLabels = maxLblLen > 7 || n > 8;
+
+  const W = 560, H = 340;
+  const pL = 62, pR = 50, pT = 18;
+  const pB = rotateLabels ? 90 : 50;
+  const pW = W - pL - pR, pH = H - pT - pB;
+  const step = pW / n;
+  const barW = Math.min(34, step * 0.5);
+
+  const barMax = Math.max(...barSerie.data.map(d => d.value)) * 1.15 || 1;
+  const lineVals = lineSerie.data.map(d => d.value);
+  const lineMax = Math.max(...lineVals) * 1.12 || 1;
+  const lineMin = Math.min(...lineVals, 0) * 0.9;
+  const lineRng = (lineMax - lineMin) || 1;
+
+  const colBar = COLORS[0], colLine = COLORS[1];
+  const X = i => pL + step * i + step / 2;
+  const Ybar = v => pT + pH - (v / barMax) * pH;
+  const Yline = v => pT + pH - ((v - lineMin) / lineRng) * pH;
+
+  const ns = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(ns, 'svg');
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  svg.setAttribute('width', W);
+  svg.setAttribute('class', 'chart-svg');
+
+  for (let i = 0; i <= 4; i++) {
+    const y = pT + pH - pH * i / 4;
+    const ln = document.createElementNS(ns, 'line');
+    setA(ln, { x1: pL, y1: y, x2: W - pR, y2: y, stroke: i === 0 ? '#223352' : '#172034', 'stroke-width': 1 });
+    svg.appendChild(ln);
+    const txL = document.createElementNS(ns, 'text');
+    setA(txL, { x: pL - 7, y: y + 4, 'text-anchor': 'end', 'font-size': 10, 'font-family': 'JetBrains Mono,monospace', fill: colBar });
+    txL.textContent = fmtNum(Math.round(barMax * i / 4));
+    svg.appendChild(txL);
+    const txR = document.createElementNS(ns, 'text');
+    setA(txR, { x: W - pR + 7, y: y + 4, 'text-anchor': 'start', 'font-size': 10, 'font-family': 'JetBrains Mono,monospace', fill: colLine });
+    txR.textContent = fmtNum(Math.round(lineMin + lineRng * i / 4));
+    svg.appendChild(txR);
+  }
+
+  barSerie.data.forEach((d, i) => {
+    const cx = X(i);
+    const bh = Math.max(2, (d.value / barMax) * pH);
+    const y = pT + pH - bh;
+    const rect = document.createElementNS(ns, 'rect');
+    setA(rect, { x: cx - barW / 2, y, width: barW, height: bh, rx: 2, fill: colBar, opacity: 0.85, style: 'cursor:pointer' });
+    rect.addEventListener('mousemove', e => tipShow(e, String(d.label), [
+      `${barSerie.name || ''}: ${fmtNum(d.value)}`,
+      `${lineSerie.name || ''}: ${fmtNum(lineSerie.data[i] ? lineSerie.data[i].value : 0)}`,
+    ]));
+    rect.addEventListener('mouseleave', tipHide);
+    svg.appendChild(rect);
+  });
+
+  let dL = '';
+  lineSerie.data.forEach((d, i) => { dL += (i ? 'L' : 'M') + X(i) + ' ' + Yline(d.value) + ' '; });
+  const line = document.createElementNS(ns, 'path');
+  setA(line, { d: dL, fill: 'none', stroke: colLine, 'stroke-width': 2.2, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' });
+  svg.appendChild(line);
+
+  lineSerie.data.forEach((d, i) => {
+    const x = X(i), y = Yline(d.value);
+    const dot = document.createElementNS(ns, 'circle');
+    setA(dot, { cx: x, cy: y, r: 3, fill: '#111827', stroke: colLine, 'stroke-width': 1.8 });
+    svg.appendChild(dot);
+    const hit = document.createElementNS(ns, 'circle');
+    setA(hit, { cx: x, cy: y, r: 14, fill: 'transparent', style: 'cursor:pointer' });
+    hit.addEventListener('mousemove', e => tipShow(e, String(d.label), [
+      `${barSerie.name || ''}: ${fmtNum(barSerie.data[i] ? barSerie.data[i].value : 0)}`,
+      `${lineSerie.name || ''}: ${fmtNum(d.value)}`,
+    ]));
+    hit.addEventListener('mouseleave', tipHide);
+    svg.appendChild(hit);
+  });
+
+  labels.forEach((lbl, i) => {
+    const cx = X(i);
+    const xl = document.createElementNS(ns, 'text');
+    const lblStr = String(lbl);
+    if (rotateLabels) {
+      const ty = pT + pH + 8;
+      setA(xl, { x: cx, y: ty, 'text-anchor': 'end', 'font-size': 10, 'font-family': 'JetBrains Mono,monospace', fill: '#334460', transform: `rotate(-40 ${cx} ${ty})` });
+      xl.textContent = lblStr.length > 18 ? lblStr.slice(0, 17) + '…' : lblStr;
+    } else {
+      setA(xl, { x: cx, y: pT + pH + 16, 'text-anchor': 'middle', 'font-size': 10, 'font-family': 'JetBrains Mono,monospace', fill: '#334460' });
+      xl.textContent = lblStr;
+    }
+    svg.appendChild(xl);
+  });
+
+  const container = document.createElement('div');
+  container.appendChild(svg);
+  container.appendChild(mkLegend([barSerie, lineSerie]));
+  return container;
+}
+
+function mkChoiceCard(card) {
+  const wrap = document.createElement('div');
+  wrap.className = 'followups';
+  (card.options || []).forEach(opt => {
+    const btn = document.createElement('button');
+    btn.className = 'fu-btn';
+    btn.textContent = opt.label;
+    btn.onclick = () => submitChoice(opt.id, opt.label);
+    wrap.appendChild(btn);
+  });
+  return wrap;
 }
 
 function setA(el, attrs) {
@@ -2602,6 +2948,61 @@ async function submit() {
 function useSuggestion(text) {
   document.getElementById('input').value = text;
   submit();
+}
+
+async function submitChoice(choiceId, label) {
+  if (!activeId) newConversation();
+  const myConvId = activeId;
+
+  lock(true);
+  const es = document.getElementById('empty-state');
+  if (es) es.remove();
+
+  const userMsg = { role: 'user', text: label, ts: Date.now() };
+  pushTo(myConvId, userMsg);
+  const box = document.getElementById('messages');
+  box.appendChild(mkMsg(userMsg));
+
+  const typing = mkTyping();
+  box.appendChild(typing);
+  scrollEnd();
+
+  const c = convs.find(x => x.id === myConvId);
+  const history = c ? c.msgs.slice(0, -1) : [];
+
+  let botMsg = null;
+  try {
+    const r = await fetch(API, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: label, choice_id: choiceId, history, lang: currentLang })
+    });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const d = await r.json();
+    botMsg = { role: 'bot', text: d.text || '—', card: d.card || null, followups: d.followups || [], dax: d.dax || null, ts: Date.now() };
+  } catch(e) {
+    console.error('[fetch error]', e);
+    botMsg = { role: 'bot', text: t('connError'), card: null, followups: [], ts: Date.now() };
+  }
+
+  typing.remove();
+  pushTo(myConvId, botMsg);
+
+  if (activeId === myConvId) {
+    try {
+      box.appendChild(mkMsg(botMsg));
+    } catch(renderErr) {
+      console.error('[render error]', renderErr);
+      const fallback = { ...botMsg, card: null };
+      box.appendChild(mkMsg(fallback));
+    }
+    scrollEnd();
+  } else {
+    _pendingConvs.add(myConvId);
+    paintSidebar();
+  }
+
+  lock(false);
 }
 
 // ── Utils ──────────────────────────────────────────────────────────────────
@@ -2734,21 +3135,29 @@ function cancelEditName() {
 let _dashboards = [];   // [{id, name, widgets: [{id, card, x, y, w, h}]}]
 let _activeDashId = null;
 let _wZIdx = 10;
-const WIDGET_DEFAULTS = { kpi: [220,130], bar: [460,300], line: [460,280], pie: [400,440], table: [520,260], filter: [220,320] };
+const WIDGET_DEFAULTS = { kpi: [220,130], bar: [460,300], line: [460,280], pie: [400,440], table: [520,260], filter: [220,320],
+  area: [460,280], multi_line: [500,320], grouped_bar: [500,320], stacked_bar: [500,320], combo: [520,320] };
 
 function getActiveDash() {
   return _dashboards.find(d => d.id === _activeDashId) || null;
 }
 
-function loadViews() {
+async function loadViews() {
   try {
-    _dashboards = JSON.parse(localStorage.getItem('pbia_dashboards') || '[]');
-    if (_dashboards.length) _activeDashId = _dashboards[0].id;
-  } catch(e) { _dashboards = []; _activeDashId = null; }
+    const r = await fetch('/api/views');
+    _dashboards = r.ok ? await r.json() : [];
+  } catch (e) { _dashboards = []; }
+  _activeDashId = _dashboards.length ? _dashboards[0].id : null;
 }
 
 function saveViews() {
-  localStorage.setItem('pbia_dashboards', JSON.stringify(_dashboards));
+  const dash = getActiveDash();
+  if (!dash) return;
+  fetch('/api/views/' + dash.id, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name: dash.name, widgets: dash.widgets }),
+  }).catch(() => {});
 }
 
 function createDashboard(name) {
@@ -2769,7 +3178,7 @@ function deleteDashboard(id) {
   if (_activeDashId === id) {
     _activeDashId = _dashboards.length ? _dashboards[0].id : null;
   }
-  saveViews();
+  fetch('/api/views/' + id, { method: 'DELETE' }).catch(() => {});
   renderViews();
 }
 
@@ -2816,8 +3225,14 @@ function switchTab(tab) {
     renderViews();
   } else {
     if (strip) strip.style.display = '';
+    document.getElementById('export-pdf-btn').style.display = 'none';
     paintSidebar();
   }
+}
+
+function exportViewPDF() {
+  if (!getActiveDash()) return;
+  window.print();
 }
 
 function addWidget(card) {
@@ -2847,9 +3262,11 @@ function renderViews() {
   canvas.innerHTML = '';
 
   const legendBar = document.getElementById('filter-legend');
+  const exportBtn = document.getElementById('export-pdf-btn');
   if (!_dashboards.length) {
     if (inputArea) inputArea.style.display = 'none';
     if (legendBar) legendBar.style.display = 'none';
+    exportBtn.style.display = 'none';
     canvas.innerHTML = `
       <div class="views-create">
         <div class="views-create-inner">
@@ -2865,11 +3282,14 @@ function renderViews() {
   } else if (!dash) {
     if (inputArea) inputArea.style.display = 'none';
     if (legendBar) legendBar.style.display = 'none';
+    exportBtn.style.display = 'none';
     canvas.innerHTML = `<div class="views-empty"><div class="views-empty-title">Selecciona una vista del menú lateral</div></div>`;
   } else {
     if (inputArea) inputArea.style.display = '';
     if (legendBar) legendBar.style.display = '';
+    exportBtn.style.display = 'flex';
     document.getElementById('bar-title').textContent = dash.name;
+    document.getElementById('print-header').textContent = dash.name;
     dash.widgets.forEach(v => canvas.appendChild(buildWidget(v)));
     // Auto-refresh table widgets so stored data (possibly truncated) gets updated
     const tableWidgets = dash.widgets.filter(v => v.card.kind === 'table' && v.query);
@@ -2911,11 +3331,16 @@ function focusWidget(id) {
 
 function mkChartEl(card, paginated = false) {
   switch (card.kind) {
-    case 'kpi':   return mkKPI(card);
-    case 'bar':   return mkBarChart(card);
-    case 'line':  return mkLineChart(card);
-    case 'pie':   return mkPieChart(card);
-    case 'table': return paginated ? mkPaginatedTable(card) : mkTable(card);
+    case 'kpi':          return mkKPI(card);
+    case 'bar':          return mkBarChart(card);
+    case 'line':
+    case 'area':
+    case 'multi_line':   return mkLineChart(card);
+    case 'pie':          return mkPieChart(card);
+    case 'grouped_bar':  return mkGroupedStackedBar(card, false);
+    case 'stacked_bar':  return mkGroupedStackedBar(card, true);
+    case 'combo':        return mkComboChart(card);
+    case 'table':        return paginated ? mkPaginatedTable(card) : mkTable(card);
     default: return document.createElement('div');
   }
 }
