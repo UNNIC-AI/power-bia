@@ -4,7 +4,7 @@ import helmet from '@fastify/helmet';
 import rateLimit from '@fastify/rate-limit';
 import type { User } from '@powerbia/contracts';
 import { createDatabase, type Database } from '@powerbia/db';
-import Fastify, { type FastifyInstance, type FastifyRequest } from 'fastify';
+import Fastify, { type FastifyRequest } from 'fastify';
 import {
   serializerCompiler,
   validatorCompiler,
@@ -28,8 +28,6 @@ declare module 'fastify' {
     user: User | null;
   }
 }
-
-export type App = FastifyInstance & { withTypeProvider<T>(): unknown };
 
 const UNSAFE_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 

@@ -53,7 +53,7 @@ catalog:
   tailwindcss: ^4.3.3
   "@tailwindcss/vite": ^4.3.3
   daisyui: ^5.7.16
-  vite: ^7.3.1
+  vite: ^8.2.1
   "@vitejs/plugin-react": ^6.0.5
 
   # --- Tooling ----------------------------------------------------------
@@ -70,3 +70,4 @@ minimumReleaseAgeExclude:
   - '@ai-sdk/gateway@4.0.51'
   - '@ai-sdk/openai@4.0.41'
   - ai@7.0.64
+  - '@ai-sdk/react@4.0.67'

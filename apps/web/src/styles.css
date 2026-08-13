@@ -1,0 +1,55 @@
+@import 'tailwindcss';
+
+@plugin "daisyui" {
+  themes:
+    light --default,
+    dark --prefersdark;
+}
+
+/* react-grid-layout ships its own stylesheet; these are the few rules it needs,
+   restyled to use daisyUI tokens instead of its default look. */
+.react-grid-layout {
+  position: relative;
+}
+
+.react-grid-item {
+  transition: transform 150ms ease;
+}
+
+.react-grid-item.react-draggable-dragging,
+.react-grid-item.resizing {
+  transition: none;
+  z-index: 20;
+}
+
+.react-grid-item > .react-resizable-handle {
+  position: absolute;
+  right: 2px;
+  bottom: 2px;
+  width: 16px;
+  height: 16px;
+  cursor: se-resize;
+  opacity: 0;
+  transition: opacity 150ms ease;
+}
+
+.react-grid-item:hover > .react-resizable-handle {
+  opacity: 0.5;
+}
+
+.react-grid-item > .react-resizable-handle::after {
+  content: '';
+  position: absolute;
+  right: 3px;
+  bottom: 3px;
+  width: 7px;
+  height: 7px;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+}
+
+.react-grid-placeholder {
+  background: var(--color-primary);
+  opacity: 0.15;
+  border-radius: var(--radius-box);
+}

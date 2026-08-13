@@ -248,6 +248,26 @@ export const datasetColumnsRelations = relations(datasetColumns, ({ one }) => ({
   table: one(datasetTables, { fields: [datasetColumns.tableId], references: [datasetTables.id] }),
 }));
 
+/**
+ * Drizzle infers a relation only when both sides are declared; a lone `many()`
+ * fails at query time rather than at build time.
+ */
+export const sessionsRelations = relations(sessions, ({ one }) => ({
+  user: one(users, { fields: [sessions.userId], references: [users.id] }),
+}));
+
+export const datasetMeasuresRelations = relations(datasetMeasures, ({ one }) => ({
+  dataset: one(datasets, { fields: [datasetMeasures.datasetId], references: [datasets.id] }),
+}));
+
+export const datasetRelationshipsRelations = relations(datasetRelationships, ({ one }) => ({
+  dataset: one(datasets, { fields: [datasetRelationships.datasetId], references: [datasets.id] }),
+}));
+
+export const datasetSynonymsRelations = relations(datasetSynonyms, ({ one }) => ({
+  dataset: one(datasets, { fields: [datasetSynonyms.datasetId], references: [datasets.id] }),
+}));
+
 export const conversationsRelations = relations(conversations, ({ one, many }) => ({
   user: one(users, { fields: [conversations.userId], references: [users.id] }),
   messages: many(messages),

@@ -1,0 +1,76 @@
+import type { Locale, TableCard as TableCardType } from '@powerbia/contracts';
+import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import { formatCell } from '../../lib/format.ts';
+
+const PAGE_SIZE = 25;
+
+export function TableCard({ card, locale }: { card: TableCardType; locale: Locale }) {
+  const { t } = useTranslation();
+  const [page, setPage] = useState(0);
+
+  const pages = Math.max(1, Math.ceil(card.rows.length / PAGE_SIZE));
+  const current = Math.min(page, pages - 1);
+  const visible = card.rows.slice(current * PAGE_SIZE, current * PAGE_SIZE + PAGE_SIZE);
+
+  if (card.rows.length === 0) {
+    return <p className="text-base-content/60 p-4 text-sm">{t('table.noRows')}</p>;
+  }
+
+  return (
+    <div className="flex h-full min-h-0 flex-col">
+      <div className="min-h-0 flex-1 overflow-auto">
+        <table className="table-zebra table-pin-rows table table-sm">
+          <thead>
+            <tr>
+              {card.columns.map((column) => (
+                <th key={column}>{column}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {visible.map((row, rowIndex) => (
+              // Row identity is positional: results have no stable key.
+              <tr key={`${current}-${rowIndex}`}>
+                {row.map((cell, cellIndex) => (
+                  <td
+                    key={card.columns[cellIndex] ?? cellIndex}
+                    className={typeof cell === 'number' ? 'text-right tabular-nums' : ''}
+                  >
+                    {formatCell(cell, locale)}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {pages > 1 && (
+        <div className="flex shrink-0 items-center justify-between gap-2 pt-2">
+          <span className="text-base-content/60 text-xs">
+            {t('table.page', { page: current + 1, pages })}
+          </span>
+          <div className="join">
+            <button
+              type="button"
+              className="btn join-item btn-xs"
+              disabled={current === 0}
+              onClick={() => setPage(current - 1)}
+            >
+              ‹
+            </button>
+            <button
+              type="button"
+              className="btn join-item btn-xs"
+              disabled={current >= pages - 1}
+              onClick={() => setPage(current + 1)}
+            >
+              ›
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
