@@ -1,4 +1,11 @@
-import type { Card, Dashboard, FilterSelection, Locale, Widget } from '@powerbia/contracts';
+import type {
+  Card,
+  ChartType,
+  Dashboard,
+  FilterSelection,
+  Locale,
+  Widget,
+} from '@powerbia/contracts';
 import { DEFAULT_WIDGET_SIZE } from '@powerbia/contracts';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import GridLayout, { type Layout, useContainerWidth } from 'react-grid-layout';
@@ -15,6 +22,13 @@ import { CardView } from '../cards/CardView.tsx';
 const COLUMNS = 12;
 const ROW_HEIGHT = 40;
 const FILTER_DEBOUNCE_MS = 700;
+
+const CONTROL_KINDS = new Set<Card['kind']>(['filter', 'choice', 'note']);
+
+/** Re-running a widget keeps its chart type. Control kinds are not chart types. */
+function asChartType(kind: Card['kind']): ChartType | null {
+  return CONTROL_KINDS.has(kind) ? null : (kind as ChartType);
+}
 
 function collectFilters(widgets: readonly Widget[]): FilterSelection[] {
   return widgets.flatMap((widget) =>
@@ -209,7 +223,7 @@ export function DashboardCanvas({ dashboard, locale }: Props) {
           text,
           locale,
           filters,
-          forcedChartType: widget.card.kind,
+          forcedChartType: asChartType(widget.card.kind),
         });
 
         if (result.card) {

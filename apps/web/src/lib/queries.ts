@@ -1,5 +1,6 @@
 import type {
   Card,
+  ChartType,
   Conversation,
   ConversationWithMessages,
   Dashboard,
@@ -182,7 +183,9 @@ export function useRunQuery() {
       text: string;
       locale: Locale;
       filters: FilterSelection[];
-      forcedChartType: Card['kind'] | null;
+      // ChartType, not Card['kind']: the API rejects the control kinds
+      // (filter, choice, note), which are not chart types.
+      forcedChartType: ChartType | null;
     }) => api.post<QueryResponse>('/query', body),
   });
 }

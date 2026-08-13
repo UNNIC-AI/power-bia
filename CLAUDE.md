@@ -25,7 +25,11 @@ migración.
 | 5 | `apps/web` — React + Tailwind + DaisyUI + TanStack | ⬜ pendiente |
 | 6 | Harness de paridad y hardening | ⬜ pendiente |
 
-Plan completo: `~/.config/claude/plans/functional-snuggling-micali.md`
+**Documentación completa en [`docs/`](./docs/README.md)** — arquitectura, pipeline,
+modelo de datos, API, frontend, decisiones y, sobre todo,
+[`docs/todo.md`](./docs/todo.md) con lo que queda pendiente.
+
+Plan original: `~/.config/claude/plans/functional-snuggling-micali.md`
 
 ---
 
