@@ -1,0 +1,26 @@
+{
+  "name": "powerbia",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@11.20.0",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "turbo dev",
+    "build": "turbo build",
+    "test": "turbo test",
+    "typecheck": "turbo typecheck",
+    "lint": "biome check .",
+    "lint:fix": "biome check --write .",
+    "db:generate": "pnpm --filter @powerbia/db generate",
+    "db:migrate": "pnpm --filter @powerbia/db migrate",
+    "db:seed": "pnpm --filter @powerbia/db seed"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "catalog:",
+    "turbo": "catalog:",
+    "typescript": "catalog:"
+  }
+}

@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  node:
+    name: lint · typecheck · test · build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.20.0
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm test
+      - run: pnpm build
+
+  gateway:
+    name: dax-gateway
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: "10.0.x"
+
+      - run: dotnet build --configuration Release
+        working-directory: services/dax-gateway
+
+      - run: dotnet test --configuration Release
+        working-directory: services/dax-gateway

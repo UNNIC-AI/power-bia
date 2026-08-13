@@ -1,0 +1,30 @@
+{
+  "$schema": "https://turborepo.com/schema.json",
+  "ui": "stream",
+  "globalEnv": [
+    "NODE_ENV",
+    "DATABASE_URL",
+    "OPENAI_API_KEY",
+    "DAX_GATEWAY_URL",
+    "DAX_GATEWAY_TOKEN",
+    "DATASET_SECRET_KEY",
+    "SESSION_COOKIE_SECRET",
+    "PORT"
+  ],
+  "tasks": {
+    "build": {
+      "dependsOn": ["^build"],
+      "outputs": ["dist/**"]
+    },
+    "typecheck": {
+      "dependsOn": ["^build"]
+    },
+    "test": {
+      "dependsOn": ["^build"]
+    },
+    "dev": {
+      "cache": false,
+      "persistent": true
+    }
+  }
+}

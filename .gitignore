@@ -1,14 +1,32 @@
+# --- Secrets ---
 .env
-data.db
-__pycache__/
+.env.local
+
+# --- Node ---
+node_modules/
+dist/
+.turbo/
+*.tsbuildinfo
+vite.config.ts.timestamp-*
+
+# --- .NET ---
+bin/
+obj/
+
+# --- Legacy MVP (kept runnable for parity fixture capture) ---
+legacy/data.db
+legacy/__pycache__/
+legacy/adomd_bin/adomd_wrapper
 *.pyc
 *.pyo
-adomd_bin/adomd_wrapper
 
+# --- Nix / direnv ---
+result
+result-*
+.direnv/
+
+# --- Editors / OS ---
+.idea/
+.vscode/
 .DS_Store
 .claude/settings.local.json
-.venv/
-venv/
-*.egg-info/
-dist/
-build/

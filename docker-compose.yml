@@ -1,0 +1,41 @@
+name: powerbia
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: powerbia
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-powerbia}
+      POSTGRES_DB: powerbia
+    ports:
+      # Published so drizzle-kit and psql can reach it from the dev shell.
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U powerbia -d powerbia"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  dax-gateway:
+    build:
+      context: ./services/dax-gateway
+    restart: unless-stopped
+    environment:
+      DAX_GATEWAY_TOKEN: ${DAX_GATEWAY_TOKEN:?set DAX_GATEWAY_TOKEN in .env}
+      ASPNETCORE_URLS: http://0.0.0.0:8080
+    # Deliberately NOT published. The gateway holds the Power BI service
+    # principal credentials and speaks to the XMLA endpoint; only apps/api
+    # needs to reach it, over the compose network, with a bearer token.
+    expose:
+      - "8080"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  pgdata:

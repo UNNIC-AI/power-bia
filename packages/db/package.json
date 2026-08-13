@@ -1,0 +1,37 @@
+{
+  "name": "@powerbia/db",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "drizzle"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run --passWithNoTests",
+    "generate": "drizzle-kit generate",
+    "migrate": "drizzle-kit migrate",
+    "studio": "drizzle-kit studio",
+    "seed": "tsx src/seed.ts"
+  },
+  "dependencies": {
+    "@powerbia/contracts": "workspace:*",
+    "drizzle-orm": "catalog:",
+    "postgres": "catalog:"
+  },
+  "devDependencies": {
+    "drizzle-kit": "catalog:",
+    "tsx": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:",
+    "@types/node": "catalog:"
+  }
+}

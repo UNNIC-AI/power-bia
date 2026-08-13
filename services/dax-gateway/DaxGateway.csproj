@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>DaxGateway</RootNamespace>
+    <!-- ADOMD needs ICU; the runtime image installs libicu. -->
+    <InvariantGlobalization>false</InvariantGlobalization>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference
+      Include="Microsoft.AnalysisServices.AdomdClient.NetCore.retail.amd64"
+      Version="19.84.1" />
+    <!-- ADOMD pulls in MSAL 4.56.0, which carries NU1901/NU1902 advisories.
+         Referencing it directly overrides the transitive version. -->
+    <PackageReference Include="Microsoft.Identity.Client" Version="4.87.0" />
+  </ItemGroup>
+
+</Project>

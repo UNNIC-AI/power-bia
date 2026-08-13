@@ -1,0 +1,37 @@
+{
+  "$schema": "https://biomejs.dev/schemas/2.4.2/schema.json",
+  "vcs": {
+    "enabled": true,
+    "clientKind": "git",
+    "useIgnoreFile": true
+  },
+  "files": {
+    "includes": ["**", "!**/dist", "!**/legacy", "!**/routeTree.gen.ts", "!**/drizzle"]
+  },
+  "formatter": {
+    "enabled": true,
+    "indentStyle": "space",
+    "indentWidth": 2,
+    "lineWidth": 100
+  },
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "recommended": true,
+      "style": {
+        "useConst": "error",
+        "noNonNullAssertion": "warn"
+      },
+      "suspicious": {
+        "noExplicitAny": "warn"
+      }
+    }
+  },
+  "javascript": {
+    "formatter": {
+      "quoteStyle": "single",
+      "semicolons": "always",
+      "trailingCommas": "all"
+    }
+  }
+}
