@@ -78,7 +78,28 @@ production.
 Required in `.env`: `OPENAI_API_KEY`, and `PBI_TENANT_ID` / `PBI_CLIENT_ID` /
 `PBI_CLIENT_SECRET` / `PBI_WORKSPACE_NAME` / `PBI_DATASET_NAME`. The three
 generated secrets (`DAX_GATEWAY_TOKEN`, `DATASET_SECRET_KEY`,
-`SESSION_COOKIE_SECRET`) each want `openssl rand -hex 32`.
+`SESSION_COOKIE_SECRET`) each want `openssl rand -hex 32`. Quote any value
+containing a space, so `set -a; . ./.env` works.
+
+## Demo mode — running it without credentials
+
+To show the app with no Power BI or OpenAI access, seed a demo account with
+pre-built cards:
+
+```bash
+pnpm --filter @powerbia/api demo
+```
+
+That creates `demo@unnic.ai` / `demo-password-1234` with a 13-widget dashboard
+covering every card kind except `choice`, plus three conversations with cards and
+DAX. The numbers are invented; the card shapes are the real contract shapes, so
+every renderer is exercised by genuine data. It is re-runnable — it drops the
+demo user's dashboards and conversations before rebuilding them.
+
+The env variables still have to be *present and well-formed* (Zod validates them
+at boot), but they can be fake. **Typing a question in demo mode will fail** at
+the first model call and surface an error in the chat — the demo is for showing
+the rendered result, not the pipeline.
 
 ## Checks
 

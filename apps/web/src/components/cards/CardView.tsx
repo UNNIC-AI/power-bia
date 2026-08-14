@@ -1,4 +1,4 @@
-import type { Card, Locale } from '@powerbia/contracts';
+import type { Card, CardKind, Locale } from '@powerbia/contracts';
 import { formatNumber } from '../../lib/format.ts';
 import { ComboChart } from '../charts/ComboChart.tsx';
 import { PieChart } from '../charts/PieChart.tsx';
@@ -72,15 +72,20 @@ export function CardView({ card, locale, onFilterChange, onChoice }: CardViewPro
   }
 }
 
+/** Kinds that size to their content instead of filling a chart-height box. */
+const INTRINSIC_HEIGHT = new Set<CardKind>(['note', 'choice']);
+const COMPACT_HEIGHT = new Set<CardKind>(['kpi']);
+
 /** A card with its title, the data-reduction notice, and a framed surface. */
 export function CardPanel({
   card,
   locale,
   actions,
-  height = 'h-72',
+  height,
   ...handlers
 }: CardViewProps & { actions?: React.ReactNode; height?: string }) {
-  const isPlain = card.kind === 'note' || card.kind === 'choice';
+  const isPlain = INTRINSIC_HEIGHT.has(card.kind);
+  const box = height ?? (COMPACT_HEIGHT.has(card.kind) ? 'h-28' : 'h-72');
 
   return (
     <div className="card bg-base-100 border-base-300 border">
@@ -92,7 +97,7 @@ export function CardPanel({
           </div>
         )}
         {card.subtitle && <p className="text-base-content/60 text-xs">{card.subtitle}</p>}
-        <div className={isPlain ? '' : height}>
+        <div className={isPlain ? '' : box}>
           <CardView card={card} locale={locale} {...handlers} />
         </div>
       </div>

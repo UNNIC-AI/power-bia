@@ -4,6 +4,25 @@ import { formatNumber } from '../../lib/format.ts';
 import { useTheme } from '../../lib/theme-context.tsx';
 import { SURFACE, seriesColor } from './palette.ts';
 
+const MIN_LABELLED_SHARE = 0.05;
+
+function renderShare({ x, y, percent }: { x?: number; y?: number; percent?: number }) {
+  if (percent === undefined || percent < MIN_LABELLED_SHARE) return <text />;
+
+  return (
+    <text
+      x={x}
+      y={y}
+      fill="var(--color-base-content)"
+      fontSize={11}
+      textAnchor="middle"
+      dominantBaseline="central"
+    >
+      {Math.round(percent * 100)}%
+    </text>
+  );
+}
+
 export function PieChart({ card, locale }: { card: PieCard; locale: Locale }) {
   const { theme } = useTheme();
   const total = card.data.reduce((sum, point) => sum + point.value, 0);
@@ -21,9 +40,9 @@ export function PieChart({ card, locale }: { card: PieCard; locale: Locale }) {
           stroke={SURFACE}
           strokeWidth={2}
           isAnimationActive={false}
-          label={({ percent }: { percent?: number }) =>
-            percent !== undefined && percent >= 0.05 ? `${Math.round(percent * 100)}%` : ''
-          }
+          // Rendered as an explicit <text> so the share wears text ink. Recharts
+          // otherwise inherits the slice colour, and a value is not a mark.
+          label={renderShare}
           labelLine={false}
         >
           {card.data.map((point, index) => (

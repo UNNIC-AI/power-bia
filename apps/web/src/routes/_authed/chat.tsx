@@ -103,18 +103,29 @@ function ChatRoute() {
       </aside>
 
       <section className="min-w-0 flex-1">
-        <ChatPanel
-          // Remounting on conversation change replays that conversation's history.
-          key={conversationId ?? 'new'}
-          datasetId={datasetId}
-          locale={locale}
-          conversationId={conversationId ?? null}
-          history={conversation.data?.messages ?? []}
-          onConversationCreated={(id) => {
-            if (id !== conversationId) select(id);
-          }}
-          {...(firstDashboard ? { onPin: pin } : {})}
-        />
+        {conversationId && !conversation.isSuccess ? (
+          <div className="flex h-full items-center justify-center">
+            <span className="loading loading-spinner" />
+          </div>
+        ) : (
+          <ChatPanel
+            /*
+             * Remounting on conversation change replays that conversation's
+             * history. useChat reads `messages` only when it initialises, so the
+             * panel must not mount until the history has actually arrived —
+             * otherwise it initialises empty and the messages never appear.
+             */
+            key={conversationId ?? 'new'}
+            datasetId={datasetId}
+            locale={locale}
+            conversationId={conversationId ?? null}
+            history={conversation.data?.messages ?? []}
+            onConversationCreated={(id) => {
+              if (id !== conversationId) select(id);
+            }}
+            {...(firstDashboard ? { onPin: pin } : {})}
+          />
+        )}
       </section>
     </div>
   );

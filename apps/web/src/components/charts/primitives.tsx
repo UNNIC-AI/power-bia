@@ -37,6 +37,13 @@ const AXIS_PROPS = {
   tickLine: false,
 } as const;
 
+const MAX_TICK_CHARS = 16;
+
+/** An angled label longer than this runs off the left edge of the plot. */
+function truncateTick(value: string): string {
+  return value.length > MAX_TICK_CHARS ? `${value.slice(0, MAX_TICK_CHARS - 1)}…` : value;
+}
+
 export function ChartAxes({ locale, angleLabels }: { locale: Locale; angleLabels: boolean }) {
   return (
     <>
@@ -45,7 +52,14 @@ export function ChartAxes({ locale, angleLabels }: { locale: Locale; angleLabels
         dataKey="label"
         {...AXIS_PROPS}
         interval="preserveStartEnd"
-        {...(angleLabels ? { angle: -35, textAnchor: 'end' as const, height: 64 } : {})}
+        {...(angleLabels
+          ? {
+              angle: -35,
+              textAnchor: 'end' as const,
+              height: 96,
+              tickFormatter: truncateTick,
+            }
+          : {})}
       />
       <YAxis
         {...AXIS_PROPS}
