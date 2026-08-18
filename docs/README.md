@@ -29,9 +29,9 @@ This directory documents the production rewrite. The original Python MVP is in
 | 0 | Monorepo, Nix devshell, docker-compose, CI | Done |
 | 1 | `packages/contracts` — shared Zod schemas | Done |
 | 2 | `packages/db` — Drizzle schema, migration, seed | Done |
-| 3 | `services/dax-gateway` — .NET over ADOMD.NET | Compiles; **never run against real Power BI** |
-| 4 | `apps/api` — Fastify, auth, pipeline, cards | Serves; **pipeline never run against real Power BI** |
-| 5 | `apps/web` — React, DaisyUI, TanStack | Builds and serves; **never visually reviewed** |
+| 3 | `services/dax-gateway` — .NET over ADOMD.NET | Working against live Power BI over XMLA |
+| 4 | `apps/api` — Fastify, auth, pipeline, cards | Working end to end against live Power BI + OpenAI |
+| 5 | `apps/web` — React, DaisyUI, TanStack | Working; chat and dashboard reviewed visually |
 | 6 | Parity harness, observability, hardening | **Not started** |
 
 Roughly 6,500 lines across the four packages. The plan this was built from is at
@@ -39,24 +39,35 @@ Roughly 6,500 lines across the four packages. The plan this was built from is at
 
 ### What is actually verified
 
-- Lint clean (75 files), 0 typecheck errors across all packages, 19 tests pass.
-- The gateway builds with zero warnings.
+- Lint clean (76 files), 0 typecheck errors across all packages, 19 tests pass.
+- The gateway builds with zero warnings and **executes DAX against live Power BI
+  over XMLA** (`EVALUATE ROW("ok", 1)` returns in ~18s cold, ~1.3s warm).
+- `INFO.TABLES()` works on the capacity, so introspection is viable.
 - The migration applies to Postgres 17; all 13 tables exist.
-- Against a live API: register, login, `/auth/me`, 401 without a cookie,
-  per-user scoping of conversations and dashboards.
+- Auth: register, login, `/auth/me`, 401 without a cookie, per-user scoping.
 - Dataset list and context round-trip the curated column notes and labels.
 - Dashboard create → add widget → batched layout save → pin toggle → read back.
 - A malformed card is rejected with a 400 by the shared contract.
+- Chat and dashboard reviewed visually in a real browser.
 
-### What is explicitly NOT verified
+**Four questions answered end to end** against the live model, ~8s each:
 
-- **No question has ever been answered end to end.** That needs
-  `OPENAI_API_KEY` and real `PBI_*` credentials. Every LLM stage and the whole
-  gateway path are unexercised.
-- **Nobody has looked at the UI.** Layout, spacing and chart geometry are
-  unconfirmed; only that modules transform and the bundle builds.
-- The 19 tests cover the card builder and password hashing. Nothing else has
-  tests.
+| Question | Result |
+|---|---|
+| "¿Cuántas botellas se vendieron en 2020?" | `kpi` · `ROW(...)` not `SUMMARIZECOLUMNS`, year filter unquoted |
+| "Evolución de botellas vendidas por mes en 2020" | `line` · canonical `CALCULATETABLE` + `SUMMARIZECOLUMNS` pattern |
+| "Top 5 categorías por botellas vendidas en 2021" | `bar` · `TOPN(5)` |
+| "¿Cuáles fueron las ventas del mes pasado?" | **Correctly refused** — anchored to today, saw it fell outside 2012–2021, did not substitute a nearby period |
+
+### What is still NOT verified
+
+- **No systematic parity check against the MVP.** Four questions is a smoke test,
+  not the golden-question harness — see [todo.md](./todo.md) P0 #2, which still
+  has to be captured from `legacy/` before it is dismantled.
+- The 19 tests cover the card builder and password hashing. The pipeline stages,
+  the DAX helpers, the routes and the whole frontend have no tests.
+- The gateway **container image** has never been built; it has only been run with
+  `dotnet run`.
 
 ## Quickstart
 

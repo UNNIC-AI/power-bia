@@ -9,31 +9,26 @@ several odd-looking choices are deliberate and documented.
 
 ---
 
-## P0 — Nobody knows whether this works yet
+## P0 — Correctness is still unproven at scale
 
-### 1. Run one question end to end
+### 1. ~~Run one question end to end~~ — DONE
 
-**Nothing in the LLM pipeline or the gateway has ever executed against real
-Power BI.** Every stage typechecks and the deterministic parts are unit-tested, but
-no question has produced an answer.
+The pipeline works against live Power BI and OpenAI. Four questions answered in
+~8s each, covering `kpi`, `line`, `bar` and the out-of-range refusal. The gateway
+executes DAX over XMLA, and `INFO.TABLES()` works on the capacity.
 
-You need in `.env`: `OPENAI_API_KEY` and real `PBI_TENANT_ID`, `PBI_CLIENT_ID`,
-`PBI_CLIENT_SECRET`, `PBI_WORKSPACE_NAME`, `PBI_DATASET_NAME`. Then re-seed (or
-update the `datasets` row — the seed writes whatever the `PBI_*` variables held at
-seed time, and encrypts the secret).
+Setup that made it work is in [../SETUP.md](../SETUP.md). Two things learned:
 
-The gateway is not port-published in compose, so either run the API inside compose
-or temporarily publish 8080 to reach it from the host devshell.
+- Run the gateway with `dotnet run -c Release` from `services/dax-gateway` for
+  local work; it is far quicker than building the container, which still has
+  never been built.
+- `pnpm --filter @powerbia/db connection` repoints an existing dataset row at the
+  `PBI_*` in the environment, without the re-seed that would drop conversations
+  and dashboards.
 
-Expect to iterate on the prompts. Watch for:
-
-- the model emitting DAX that `patchMeasureOnlySummarize` does not catch
-- column aliases not matching what `buildCard` tries to resolve, which shows up as
-  a chart silently degrading to a table
-- `INFO.*` availability on your capacity (needed later for introspection)
-
-**Requires Premium, PPU or Fabric capacity for XMLA.** Check that before debugging
-code.
+Known nit: the writer sometimes formats numbers in its Spanish prose with en-US
+separators (`29,841,264` rather than `29.841.264`). Card values are formatted
+client-side and are correct; this is only the prose. One line in `WRITER_ROLE`.
 
 ### 2. Golden-question parity harness
 
