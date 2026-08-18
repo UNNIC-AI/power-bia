@@ -119,5 +119,9 @@ pnpm dev                         # api + web
 pnpm typecheck && pnpm test && pnpm lint
 ```
 
-`.env` se genera a partir de `.env.example`. Requiere `OPENAI_API_KEY` y las credenciales
-`PBI_*` del service principal para que el pipeline funcione de verdad.
+`.env` se genera a partir de `.env.example`. Para que el pipeline funcione de verdad hacen
+falta credenciales reales y varios ajustes en Azure/Power BI: la lista completa está en
+[`SETUP.md`](./SETUP.md).
+
+Sin credenciales, `pnpm --filter @powerbia/api demo` deja la app navegable con datos de
+ejemplo (`demo@unnic.ai` / `demo-password-1234`).

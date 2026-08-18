@@ -13,7 +13,7 @@ This directory documents the production rewrite. The original Python MVP is in
 
 | Document | What it covers |
 |---|---|
-| [setup.md](./setup.md) | **Every credential, tenant setting and capacity requirement needed to make the real pipeline work** |
+| [../SETUP.md](../SETUP.md) | **Every credential, tenant setting and capacity requirement needed to make the real pipeline work** |
 | [architecture.md](./architecture.md) | The four deployables, how a request flows, why the pieces are split this way |
 | [pipeline.md](./pipeline.md) | The LLM pipeline stage by stage, and the card builder — the part that carries the product's value |
 | [data-model.md](./data-model.md) | Postgres schema, the dataset catalog, secret encryption |
