@@ -92,10 +92,13 @@ Server side (`routes/chat.ts`):
 
 ```ts
 const stream = createUIMessageStream<ChatUIMessage>({
-  execute: ({ writer }) => {
+  execute: async ({ writer }) => {
     writer.write({ type: 'data-conversation', data: { conversationId }, transient: true });
     writer.write({ type: 'data-card', id: 'card', data: { card, dax, followUps: [] } });
     if (outcome.stream) writer.merge(toUIMessageStream({ stream: outcome.stream.stream }));
+
+    const answer = outcome.text ?? (await readStreamText(outcome.stream));
+    await appendMessage({ ...answer, card, dax });
   },
 });
 
@@ -103,9 +106,17 @@ reply.hijack();
 await pipeUIMessageStreamToResponse({ response: reply.raw, stream });
 ```
 
-The assistant message is persisted **after** the stream completes, reading the
-accumulated text off the stream result. `readStreamText()` swallows errors so a
-client disconnecting mid-answer does not lose the persisted message.
+The assistant message is persisted **inside `execute`, before the stream closes**.
+`createUIMessageStream` holds the stream open until an async `execute` settles, so
+the conversation is readable from the database the instant the client sees the
+stream end. Persisting after `pipeUIMessageStreamToResponse` instead — as this did
+originally — raced the refetch the client fires on finish, which could cache a
+conversation whose answer had not landed yet.
+
+The await does not stall the prose: `merge` is already draining the model stream
+into the response, and `readStreamText()` reads its own tee. `readStreamText()`
+swallows errors so a client disconnecting mid-answer does not lose the persisted
+message.
 
 ### Client side
 

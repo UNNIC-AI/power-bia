@@ -33,6 +33,10 @@ export const resources = {
         hideDax: 'Ocultar DAX',
         pinToDashboard: 'Fijar a una vista',
         delete: 'Eliminar',
+        send: 'Enviar',
+        confirmDeleteTitle: '¿Eliminar esta consulta?',
+        confirmDeleteBody:
+          'Se eliminará «{{title}}» y todos sus mensajes. Esta acción no se puede deshacer.',
         starters: [
           '¿Cuáles fueron las ventas totales en 2021?',
           'Muéstrame la evolución de ventas de 2012 a 2021',
@@ -59,9 +63,25 @@ export const resources = {
         export: 'Exportar PDF',
         selectedOf: '{{selected}} de {{total}} seleccionados',
         valueCount: '{{count}} valores',
+        confirmDeleteTitle: '¿Eliminar esta vista?',
+        confirmDeleteBody:
+          'Se eliminará «{{name}}» y todos sus gráficos. Esta acción no se puede deshacer.',
       },
-      table: { page: 'Página {{page}} de {{pages}}', noRows: 'Sin resultados' },
-      common: { retry: 'Reintentar', loading: 'Cargando…', error: 'Algo ha ido mal' },
+      table: {
+        page: 'Página {{page}} de {{pages}}',
+        noRows: 'Sin resultados',
+        previous: 'Página anterior',
+        next: 'Página siguiente',
+      },
+      common: {
+        retry: 'Reintentar',
+        loading: 'Cargando…',
+        error: 'Algo ha ido mal',
+        lightMode: 'Modo claro',
+        darkMode: 'Modo oscuro',
+        cancel: 'Cancelar',
+        delete: 'Eliminar',
+      },
     },
   },
   en: {
@@ -92,6 +112,10 @@ export const resources = {
         hideDax: 'Hide DAX',
         pinToDashboard: 'Pin to a dashboard',
         delete: 'Delete',
+        send: 'Send',
+        confirmDeleteTitle: 'Delete this query?',
+        confirmDeleteBody:
+          '“{{title}}” and all of its messages will be deleted. This cannot be undone.',
         starters: [
           'What were total sales in 2021?',
           'Show me the sales trend from 2012 to 2021',
@@ -118,9 +142,25 @@ export const resources = {
         export: 'Export PDF',
         selectedOf: '{{selected}} of {{total}} selected',
         valueCount: '{{count}} values',
+        confirmDeleteTitle: 'Delete this dashboard?',
+        confirmDeleteBody:
+          '“{{name}}” and all of its charts will be deleted. This cannot be undone.',
       },
-      table: { page: 'Page {{page}} of {{pages}}', noRows: 'No results' },
-      common: { retry: 'Retry', loading: 'Loading…', error: 'Something went wrong' },
+      table: {
+        page: 'Page {{page}} of {{pages}}',
+        noRows: 'No results',
+        previous: 'Previous page',
+        next: 'Next page',
+      },
+      common: {
+        retry: 'Retry',
+        loading: 'Loading…',
+        error: 'Something went wrong',
+        lightMode: 'Light mode',
+        darkMode: 'Dark mode',
+        cancel: 'Cancel',
+        delete: 'Delete',
+      },
     },
   },
 } as const;

@@ -1,8 +1,9 @@
 import { useChat } from '@ai-sdk/react';
 import type { Card, CardPart, Locale, Message } from '@powerbia/contracts';
+import { IconPin, IconSend2 } from '@tabler/icons-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { DefaultChatTransport, type UIMessage } from 'ai';
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { keys } from '../../lib/queries.ts';
 import { CardPanel } from '../cards/CardView.tsx';
@@ -101,6 +102,25 @@ export function ChatPanel({
 
   const busy = status === 'submitted' || status === 'streaming';
 
+  /*
+   * Sending pulls the new question — and the thinking indicator under it — into
+   * view. Keyed on the number of questions rather than on `messages` so that the
+   * streaming answer does not yank the viewport on every token, and seeded with
+   * the mount-time count so replaying a conversation's history does not scroll.
+   */
+  const questionCount = messages.reduce(
+    (count, message) => (message.role === 'user' ? count + 1 : count),
+    0,
+  );
+  const scrolledFor = useRef(questionCount);
+
+  useEffect(() => {
+    if (scrolledFor.current === questionCount) return;
+
+    scrolledFor.current = questionCount;
+    bottom.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+  }, [questionCount]);
+
   const send = useCallback(
     (text: string) => {
       const trimmed = text.trim();
@@ -167,13 +187,14 @@ export function ChatPanel({
                       onPin && payload.card.kind !== 'choice' ? (
                         <button
                           type="button"
-                          className="btn btn-ghost btn-xs"
+                          className="btn btn-ghost btn-square btn-xs"
                           title={t('chat.pinToDashboard')}
+                          aria-label={t('chat.pinToDashboard')}
                           onClick={() => {
                             if (payload.card) onPin(payload.card, lastQuestion.current);
                           }}
                         >
-                          📌
+                          <IconPin size={16} stroke={1.75} />
                         </button>
                       ) : undefined
                     }
@@ -220,11 +241,13 @@ export function ChatPanel({
           />
           <button
             type="button"
-            className="btn btn-primary"
+            className="btn btn-primary btn-square"
+            title={t('chat.send')}
+            aria-label={t('chat.send')}
             disabled={busy || !input.trim()}
             onClick={() => send(input)}
           >
-            →
+            <IconSend2 size={18} stroke={1.75} />
           </button>
         </div>
         <p className="text-base-content/50 mt-1 text-[11px]">{t('chat.hint')}</p>

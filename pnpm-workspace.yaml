@@ -53,6 +53,11 @@ catalog:
   tailwindcss: ^4.3.3
   "@tailwindcss/vite": ^4.3.3
   daisyui: ^5.7.16
+  # Import from the package root, not `dist/esm/icons/IconX.mjs` — the per-icon
+  # files ship no `.d.ts`, so deep imports are untyped. The barrel is safe: the
+  # package is ESM with `sideEffects: false`, so Rollup drops the ~5.9k unused
+  # icons from the bundle. Only the dev-server prebundle pays for the full set.
+  "@tabler/icons-react": ^3.46.0
   vite: ^8.2.1
   "@vitejs/plugin-react": ^6.0.5
 

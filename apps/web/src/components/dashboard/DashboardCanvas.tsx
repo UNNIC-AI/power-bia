@@ -7,6 +7,7 @@ import type {
   Widget,
 } from '@powerbia/contracts';
 import { DEFAULT_WIDGET_SIZE } from '@powerbia/contracts';
+import { IconLock, IconLockOpen, IconPencil, IconRefresh, IconX } from '@tabler/icons-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import GridLayout, { type Layout, useContainerWidth } from 'react-grid-layout';
 import { useTranslation } from 'react-i18next';
@@ -72,44 +73,52 @@ function WidgetFrame({
 
         <button
           type="button"
-          className={`btn btn-ghost btn-xs ${widget.pinned ? 'text-primary' : ''}`}
+          className={`btn btn-ghost btn-square btn-xs ${widget.pinned ? 'text-primary' : ''}`}
           title={widget.pinned ? t('dashboards.unpin') : t('dashboards.pin')}
+          aria-label={widget.pinned ? t('dashboards.unpin') : t('dashboards.pin')}
           onClick={onTogglePin}
         >
-          {widget.pinned ? '🔒' : '🔓'}
+          {widget.pinned ? (
+            <IconLock size={14} stroke={1.75} />
+          ) : (
+            <IconLockOpen size={14} stroke={1.75} />
+          )}
         </button>
 
         {widget.query && (
           <>
             <button
               type="button"
-              className="btn btn-ghost btn-xs"
+              className="btn btn-ghost btn-square btn-xs"
               title={t('dashboards.refresh')}
+              aria-label={t('dashboards.refresh')}
               onClick={onRefresh}
             >
-              ↻
+              <IconRefresh size={14} stroke={1.75} />
             </button>
             <button
               type="button"
-              className="btn btn-ghost btn-xs"
+              className="btn btn-ghost btn-square btn-xs"
               title={t('dashboards.edit')}
+              aria-label={t('dashboards.edit')}
               onClick={() => {
                 setDraft(widget.query ?? '');
                 setEditing(true);
               }}
             >
-              ✎
+              <IconPencil size={14} stroke={1.75} />
             </button>
           </>
         )}
 
         <button
           type="button"
-          className="btn btn-ghost btn-xs"
+          className="btn btn-ghost btn-square btn-xs"
           title={t('dashboards.remove')}
+          aria-label={t('dashboards.remove')}
           onClick={onRemove}
         >
-          ×
+          <IconX size={14} stroke={1.75} />
         </button>
       </div>
 

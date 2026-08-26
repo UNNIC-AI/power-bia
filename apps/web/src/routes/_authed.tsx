@@ -1,4 +1,5 @@
 import type { Locale } from '@powerbia/contracts';
+import { IconMoon, IconSun } from '@tabler/icons-react';
 import { createFileRoute, Link, Outlet, useNavigate } from '@tanstack/react-router';
 import { useTranslation } from 'react-i18next';
 import { setLocale, storedLocale } from '../lib/i18n.ts';
@@ -73,8 +74,18 @@ function AuthedLayout() {
           {storedLocale().toUpperCase()}
         </button>
 
-        <button type="button" className="btn btn-ghost btn-xs" onClick={toggle}>
-          {theme === 'dark' ? '☀' : '☾'}
+        <button
+          type="button"
+          className="btn btn-ghost btn-square btn-xs"
+          title={theme === 'dark' ? t('common.lightMode') : t('common.darkMode')}
+          aria-label={theme === 'dark' ? t('common.lightMode') : t('common.darkMode')}
+          onClick={toggle}
+        >
+          {theme === 'dark' ? (
+            <IconSun size={16} stroke={1.75} />
+          ) : (
+            <IconMoon size={16} stroke={1.75} />
+          )}
         </button>
 
         <div className="dropdown dropdown-end">

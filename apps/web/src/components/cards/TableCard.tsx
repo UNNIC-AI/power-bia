@@ -1,4 +1,5 @@
 import type { Locale, TableCard as TableCardType } from '@powerbia/contracts';
+import { IconChevronLeft, IconChevronRight } from '@tabler/icons-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { formatCell } from '../../lib/format.ts';
@@ -54,19 +55,23 @@ export function TableCard({ card, locale }: { card: TableCardType; locale: Local
           <div className="join">
             <button
               type="button"
-              className="btn join-item btn-xs"
+              className="btn join-item btn-square btn-xs"
+              title={t('table.previous')}
+              aria-label={t('table.previous')}
               disabled={current === 0}
               onClick={() => setPage(current - 1)}
             >
-              ‹
+              <IconChevronLeft size={14} stroke={1.75} />
             </button>
             <button
               type="button"
-              className="btn join-item btn-xs"
+              className="btn join-item btn-square btn-xs"
+              title={t('table.next')}
+              aria-label={t('table.next')}
               disabled={current >= pages - 1}
               onClick={() => setPage(current + 1)}
             >
-              ›
+              <IconChevronRight size={14} stroke={1.75} />
             </button>
           </div>
         </div>

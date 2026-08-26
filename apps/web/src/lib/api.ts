@@ -9,10 +9,21 @@ export class ApiError extends Error {
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  /*
+   * Only declare a JSON body when there is one. `DELETE` sends none, and
+   * Fastify rejects `content-type: application/json` with an empty body outright
+   * — FST_ERR_CTP_EMPTY_JSON_BODY, a 400 before the route ever runs. That is why
+   * every delete button in the app silently did nothing.
+   */
+  const headers = {
+    ...(init?.body === undefined ? {} : { 'content-type': 'application/json' }),
+    ...init?.headers,
+  };
+
   const response = await fetch(`/api${path}`, {
     ...init,
     credentials: 'same-origin',
-    headers: { 'content-type': 'application/json', ...init?.headers },
+    headers,
   });
 
   if (!response.ok) {

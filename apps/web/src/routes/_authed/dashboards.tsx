@@ -1,6 +1,8 @@
+import { IconPlus, IconTrash } from '@tabler/icons-react';
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { ConfirmDialog } from '../../components/ConfirmDialog.tsx';
 import { DashboardCanvas } from '../../components/dashboard/DashboardCanvas.tsx';
 import {
   useCreateDashboard,
@@ -31,6 +33,9 @@ function DashboardsRoute() {
 
   const [name, setName] = useState('');
 
+  /** Deleting is irreversible, so the row is held here until it is confirmed. */
+  const [pendingDelete, setPendingDelete] = useState<{ id: string; name: string } | null>(null);
+
   const datasetId = datasets.data?.[0]?.id;
   const activeId = selectedId ?? dashboards.data?.[0]?.id;
   const dashboard = useDashboard(activeId ?? null);
@@ -48,6 +53,13 @@ function DashboardsRoute() {
     select(created.id);
   };
 
+  const confirmDelete = () => {
+    if (!pendingDelete) return;
+
+    deleteDashboard.mutate(pendingDelete.id);
+    setPendingDelete(null);
+  };
+
   return (
     <div className="flex h-full min-h-0">
       <aside className="bg-base-100 border-base-300 hidden w-56 shrink-0 flex-col border-r md:flex print:hidden">
@@ -63,11 +75,13 @@ function DashboardsRoute() {
           />
           <button
             type="button"
-            className="btn btn-primary btn-sm"
+            className="btn btn-primary btn-square btn-sm"
+            title={t('dashboards.create')}
+            aria-label={t('dashboards.create')}
             disabled={!name.trim() || createDashboard.isPending}
             onClick={() => void create()}
           >
-            +
+            <IconPlus size={16} stroke={1.75} />
           </button>
         </div>
 
@@ -88,13 +102,15 @@ function DashboardsRoute() {
                 <span className="badge badge-ghost badge-xs">{entry.widgetCount}</span>
                 <button
                   type="button"
-                  className="btn btn-ghost btn-xs"
+                  className="btn btn-ghost btn-square btn-xs"
+                  title={t('dashboards.remove')}
+                  aria-label={t('dashboards.remove')}
                   onClick={(event) => {
                     event.stopPropagation();
-                    deleteDashboard.mutate(entry.id);
+                    setPendingDelete({ id: entry.id, name: entry.name });
                   }}
                 >
-                  ×
+                  <IconTrash size={14} stroke={1.75} />
                 </button>
               </button>
             </li>
@@ -111,6 +127,14 @@ function DashboardsRoute() {
           </div>
         )}
       </section>
+
+      <ConfirmDialog
+        open={pendingDelete !== null}
+        title={t('dashboards.confirmDeleteTitle')}
+        body={t('dashboards.confirmDeleteBody', { name: pendingDelete?.name ?? '' })}
+        onConfirm={confirmDelete}
+        onCancel={() => setPendingDelete(null)}
+      />
     </div>
   );
 }

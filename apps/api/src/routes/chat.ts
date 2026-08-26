@@ -71,7 +71,18 @@ export async function chatRoutes(app: FastifyInstance) {
     });
 
     const stream = createUIMessageStream<ChatUIMessage>({
-      execute: ({ writer }) => {
+      /*
+       * Persisting here rather than after the pipe is what makes the answer
+       * readable the instant the client sees the stream close: an async
+       * `execute` holds the stream open until it settles. Persisting afterwards
+       * raced the refetch the client fires on finish, which could then store a
+       * conversation whose answer was still missing — the same "only appears
+       * after a refresh" symptom, one navigation later.
+       *
+       * The await does not stall the prose: `merge` is already draining the
+       * model stream into the response, and `readStreamText` reads its own tee.
+       */
+      execute: async ({ writer }) => {
         writer.write({
           type: 'data-conversation',
           data: { conversationId: conversation.id },
@@ -85,24 +96,24 @@ export async function chatRoutes(app: FastifyInstance) {
         });
 
         if (outcome.stream) writer.merge(toUIMessageStream({ stream: outcome.stream.stream }));
+
+        const answer = outcome.text ?? (await readStreamText(outcome.stream));
+
+        await appendMessage({
+          db: app.db,
+          conversationId: conversation.id,
+          role: 'assistant',
+          text: answer,
+          card: outcome.card,
+          dax: outcome.dax,
+          decision: outcome.decision,
+          resultColumns: outcome.resultColumns,
+        });
       },
     });
 
     reply.hijack();
     await pipeUIMessageStreamToResponse({ response: reply.raw, stream });
-
-    const answer = outcome.text ?? (await readStreamText(outcome.stream));
-
-    await appendMessage({
-      db: app.db,
-      conversationId: conversation.id,
-      role: 'assistant',
-      text: answer,
-      card: outcome.card,
-      dax: outcome.dax,
-      decision: outcome.decision,
-      resultColumns: outcome.resultColumns,
-    });
   });
 
   /** Non-streaming path for widget refresh and inline widget editing. */

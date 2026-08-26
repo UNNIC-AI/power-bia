@@ -1,4 +1,5 @@
 import type { FilterCard as FilterCardType } from '@powerbia/contracts';
+import { IconX } from '@tabler/icons-react';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -39,11 +40,12 @@ export function FilterCard({ card, onChange }: Props) {
         {selected.length > 0 && (
           <button
             type="button"
-            className="btn btn-ghost btn-xs"
+            className="btn btn-ghost btn-square btn-xs"
             title={t('dashboards.clearFilter')}
+            aria-label={t('dashboards.clearFilter')}
             onClick={() => onChange?.([])}
           >
-            ×
+            <IconX size={14} stroke={1.75} />
           </button>
         )}
       </div>

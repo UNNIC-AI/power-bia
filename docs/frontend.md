@@ -23,8 +23,19 @@ and `/dashboards?d=<id>`. Fewer route files, still deep-linkable. Note that
 `navigate` must pass the key explicitly — `search={{ c: undefined }}`, not
 `search={{}}`, which is a type error.
 
-`ChatPanel` is keyed on the conversation id so switching conversations remounts it
-and replays that conversation's history as the initial messages.
+`ChatPanel` is remounted to switch conversations, which replays that
+conversation's history as the initial messages — `useChat` reads `messages` only
+when it initialises. It is keyed on a **generation counter**, not on the
+conversation id directly, because of one transition where the id changes but the
+thread does not: a brand-new conversation learns its id from the first frame of
+its own answer stream. Keying on the id remounted the panel there, tearing down
+the in-flight `useChat`; the history that replaced it could not contain the answer
+yet, so the answer only appeared after a manual refresh.
+
+`ChatRoute` therefore reconciles `?c=` against the previous value during render
+and advances the generation on every move except that adoption. Doing it there
+rather than inside the navigation helpers is what keeps the browser's own Back and
+Forward correct — they change the search param without going through `select`.
 
 ## State
 
@@ -34,6 +45,20 @@ typed fetch wrapper that throws `ApiError` with the server's message.
 
 No global client state library. Theme is a small context (`lib/theme-context.tsx`),
 locale is i18next, everything else is server state or local component state.
+
+## Destructive actions
+
+Deleting a chat or a view goes through `components/ConfirmDialog.tsx` — a native
+`<dialog>` driven with `showModal()`, which brings the focus trap, Esc handling,
+the inert background and top-layer stacking with it. Setting the `open` attribute
+declaratively renders the element but gives all of that up, so the route holds a
+`pendingDelete` object and the dialog opens and closes imperatively from an effect.
+
+The dialog names the row it is about to remove, because the sidebars truncate long
+titles and the trash icons sit one row apart.
+
+Removing a **widget** from a view is deliberately not guarded: it is a single card
+that can be pinned again from chat, not a thread or a whole dashboard.
 
 ## Card renderers
 
@@ -91,17 +116,37 @@ rather than leaving the user to guess.
 
 ## Theming
 
-DaisyUI's stock `light` and `dark` themes, no custom palette:
+DaisyUI's stock `light` and `black` themes, no custom palette:
 
 ```css
 @import 'tailwindcss';
-@plugin "daisyui" { themes: light --default, dark --prefersdark; }
+@plugin "daisyui" { themes: light --default, black --prefersdark; }
 ```
+
+The app's own mode is `light | dark` everywhere — the chart palette and axis ink
+are keyed on the *surface*, not on whichever DaisyUI theme paints it. `DAISY_THEME`
+in `lib/theme.ts` is the only place the theme names appear, so swapping the dark
+theme for another (`dracula`, `night`, back to `dark`) is a one-line change with no
+churn in `palette.ts`.
 
 The toggle stamps `data-theme` on `<html>`; the initial value comes from
 localStorage falling back to `prefers-color-scheme`. Charts read the theme through
 `useTheme()` to pick their palette column, because Recharts needs concrete colour
 values rather than CSS variables for series fills.
+
+## Icons
+
+`@tabler/icons-react`, imported from the package root (`import { IconX } from
+'@tabler/icons-react'`). **Do not deep-import** `dist/esm/icons/IconX.mjs` — those
+files ship no `.d.ts`, so the import is untyped. The barrel costs nothing in the
+bundle: the package is ESM with `sideEffects: false`, and a production build ships
+only the icons actually referenced (13 at the time of writing) plus a 0.9 kB shared
+factory chunk.
+
+House style is `size={14}` on `btn-xs`, `16` on `btn-sm`/navbar, `18` on `btn`, with
+`stroke={1.75}` throughout — Tabler's default stroke of 2 is heavy at small sizes.
+An icon-only button carries both `title` and `aria-label`, since the glyph it
+replaced was at least readable text.
 
 `styles.css` also carries a handful of react-grid-layout overrides, restyled to use
 DaisyUI tokens. Biome does not lint CSS here — it cannot parse Tailwind's
