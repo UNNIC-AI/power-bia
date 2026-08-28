@@ -60,8 +60,8 @@ is how refresh preserves the shape the user chose.
 | GET | `/:id` | With widgets. 404 if not owned |
 | POST | `/` | `{ name, datasetId }` |
 | DELETE | `/:id` | Cascades to widgets |
-| POST | `/:id/widgets` | `{ card, query, layout }` — the card is validated against the union |
-| PATCH | `/:id/widgets/:widgetId` | Partial: `card`, `query`, `pinned`, `layout` |
+| POST | `/:id/widgets` | `{ card, query, dax, layout }` — the card is validated against the union |
+| PATCH | `/:id/widgets/:widgetId` | Partial: `card`, `query`, `dax`, `pinned`, `layout` |
 | DELETE | `/:id/widgets/:widgetId` | |
 | PUT | `/:id/layouts` | Batch `[{ id, x, y, width, height }]` in one transaction |
 

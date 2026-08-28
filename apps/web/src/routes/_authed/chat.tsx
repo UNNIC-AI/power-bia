@@ -111,13 +111,14 @@ function ChatRoute() {
     setPendingDelete(null);
   };
 
-  const pin = (card: Card, query: string) => {
+  const pin = (card: Card, query: string, dax: string | null) => {
     if (!firstDashboard) return;
     const size = DEFAULT_WIDGET_SIZE[card.kind];
 
     void addWidget.mutateAsync({
       card,
       query: query || null,
+      dax,
       layout: { x: 0, y: 0, width: size.width, height: size.height },
     });
   };

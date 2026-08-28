@@ -223,21 +223,40 @@ const note: Card = {
   text: 'Ventas por producto, categoría, proveedor, tienda, ciudad o condado, y evolución temporal entre 2012 y 2021. Pide un formato concreto ("en barras", "quesito", "compara 2020 y 2021") y lo respeta.',
 };
 
-/** [card, question that produced it] — the question makes the widget re-runnable. */
-const WIDGETS: [Card, string | null][] = [
-  [totalBottles, '¿Cuántas botellas se vendieron en 2021?'],
-  [revenue, '¿Cuál fue la facturación total de 2021?'],
-  [storeFilter, null],
-  [monthlyTrend, 'Muéstrame la evolución de ventas en 2021 y su tendencia'],
-  [topCategories, 'Top categorías por botellas vendidas en 2021'],
-  [distribution, 'Distribución de ventas por categoría'],
-  [byCategoryOverTime, 'Evolución de ventas por categoría en 2021'],
-  [yearOverYear, 'Compara las botellas vendidas por mes entre 2020 y 2021'],
-  [stacked, 'Composición de ventas por categoría y trimestre'],
-  [volumeAndPrice, 'Combina botellas vendidas con el precio medio por mes'],
-  [cumulative, 'Facturación acumulada durante 2021'],
-  [invoices, 'Dame el listado de facturas recientes'],
-  [note, null],
+/**
+ * The DAX each question generated. Invented like the numbers, but shaped like
+ * what the pipeline really emits, because the widget edit panel shows the
+ * question and its DAX side by side.
+ */
+const DAX = {
+  totalBottles: `EVALUATE\nROW("Botellas vendidas", CALCULATE(SUM('Invoices'[Bottles Sold]), 'Calendar'[#Año] = 2021))`,
+  revenue: `EVALUATE\nROW(\n    "Facturación",\n    CALCULATE(\n        SUMX('Invoices', 'Invoices'[Bottles Sold] * RELATED('Items'[State Bottle Retail])),\n        'Calendar'[#Año] = 2021\n    )\n)`,
+  monthlyTrend: `EVALUATE\nCALCULATETABLE(\n    SUMMARIZECOLUMNS(\n        'Calendar'[Año#Mes],\n        'Calendar'[AñoMesCorto],\n        "Ventas", SUM('Invoices'[Bottles Sold])\n    ),\n    'Calendar'[#Año] = 2021\n)\nORDER BY 'Calendar'[Año#Mes] ASC`,
+  topCategories: `EVALUATE\nTOPN(\n    10,\n    CALCULATETABLE(\n        SUMMARIZECOLUMNS(\n            'Items'[Category Name],\n            "Ventas", SUM('Invoices'[Bottles Sold])\n        ),\n        'Calendar'[#Año] = 2021\n    ),\n    [Ventas], DESC\n)`,
+  distribution: `EVALUATE\nCALCULATETABLE(\n    SUMMARIZECOLUMNS(\n        'Items'[Category Name],\n        "Ventas", SUM('Invoices'[Bottles Sold])\n    ),\n    'Calendar'[#Año] = 2021\n)`,
+  byCategoryOverTime: `EVALUATE\nCALCULATETABLE(\n    SUMMARIZECOLUMNS(\n        'Calendar'[Año#Mes],\n        'Calendar'[AñoMesCorto],\n        'Items'[Category Name],\n        "Ventas", SUM('Invoices'[Bottles Sold])\n    ),\n    'Calendar'[#Año] = 2021\n)\nORDER BY 'Calendar'[Año#Mes] ASC`,
+  yearOverYear: `EVALUATE\nCALCULATETABLE(\n    SUMMARIZECOLUMNS(\n        'Calendar'[#Mes],\n        'Calendar'[Mes],\n        'Calendar'[#Año],\n        "Ventas", SUM('Invoices'[Bottles Sold])\n    ),\n    'Calendar'[#Año] IN {2020, 2021}\n)\nORDER BY 'Calendar'[#Mes] ASC, 'Calendar'[#Año] ASC`,
+  stacked: `EVALUATE\nCALCULATETABLE(\n    SUMMARIZECOLUMNS(\n        'Calendar'[Trimestre],\n        'Items'[Category Name],\n        "Ventas", SUM('Invoices'[Bottles Sold])\n    ),\n    'Calendar'[#Año] = 2021\n)\nORDER BY 'Calendar'[Trimestre] ASC`,
+  volumeAndPrice: `EVALUATE\nCALCULATETABLE(\n    SUMMARIZECOLUMNS(\n        'Calendar'[Año#Mes],\n        'Calendar'[AñoMesCorto],\n        "Botellas vendidas", SUM('Invoices'[Bottles Sold]),\n        "Precio medio venta", AVERAGE('Items'[State Bottle Retail])\n    ),\n    'Calendar'[#Año] = 2021\n)\nORDER BY 'Calendar'[Año#Mes] ASC`,
+  cumulative: `EVALUATE\nCALCULATETABLE(\n    ADDCOLUMNS(\n        SUMMARIZE('Calendar', 'Calendar'[Año#Mes], 'Calendar'[AñoMesCorto]),\n        "Facturación acumulada",\n            CALCULATE(\n                SUMX('Invoices', 'Invoices'[Bottles Sold] * RELATED('Items'[State Bottle Retail])),\n                FILTER(ALLSELECTED('Calendar'), 'Calendar'[Año#Mes] <= EARLIER('Calendar'[Año#Mes]))\n            )\n    ),\n    'Calendar'[#Año] = 2021\n)\nORDER BY 'Calendar'[Año#Mes] ASC`,
+  invoices: `EVALUATE\nTOPN(\n    60,\n    SELECTCOLUMNS(\n        CALCULATETABLE('Invoices', 'Calendar'[#Año] = 2021),\n        "Factura", 'Invoices'[Invoice],\n        "Fecha factura", 'Invoices'[Date],\n        "Tienda", RELATED('Stores'[Store Name]),\n        "Categoría", RELATED('Items'[Category Name]),\n        "Botellas vendidas", 'Invoices'[Bottles Sold],\n        "Precio retail", RELATED('Items'[State Bottle Retail])\n    ),\n    'Invoices'[Date], DESC\n)`,
+} as const;
+
+/** [card, question that produced it, the DAX it generated] — the question makes the widget re-runnable. */
+const WIDGETS: [Card, string | null, string | null][] = [
+  [totalBottles, '¿Cuántas botellas se vendieron en 2021?', DAX.totalBottles],
+  [revenue, '¿Cuál fue la facturación total de 2021?', DAX.revenue],
+  [storeFilter, null, null],
+  [monthlyTrend, 'Muéstrame la evolución de ventas en 2021 y su tendencia', DAX.monthlyTrend],
+  [topCategories, 'Top categorías por botellas vendidas en 2021', DAX.topCategories],
+  [distribution, 'Distribución de ventas por categoría', DAX.distribution],
+  [byCategoryOverTime, 'Evolución de ventas por categoría en 2021', DAX.byCategoryOverTime],
+  [yearOverYear, 'Compara las botellas vendidas por mes entre 2020 y 2021', DAX.yearOverYear],
+  [stacked, 'Composición de ventas por categoría y trimestre', DAX.stacked],
+  [volumeAndPrice, 'Combina botellas vendidas con el precio medio por mes', DAX.volumeAndPrice],
+  [cumulative, 'Facturación acumulada durante 2021', DAX.cumulative],
+  [invoices, 'Dame el listado de facturas recientes', DAX.invoices],
+  [note, null, null],
 ];
 
 const CONVERSATIONS: { title: string; turns: [string, string, Card | null, string | null][] }[] = [
@@ -248,13 +267,13 @@ const CONVERSATIONS: { title: string; turns: [string, string, Card | null, strin
         '¿Cuántas botellas se vendieron en 2021?',
         'En 2021 se vendieron 6.284.915 botellas, un 11,4 % más que en 2020. El mejor mes fue diciembre.',
         totalBottles,
-        `EVALUATE\nROW("Botellas vendidas", CALCULATE(SUM('Invoices'[Bottles Sold]), 'Calendar'[#Año] = 2021))`,
+        DAX.totalBottles,
       ],
       [
         'Muéstrame la evolución mes a mes y su tendencia',
         'Aquí tienes la evolución mensual. La tendencia es claramente ascendente: el segundo semestre supera al primero en todos los meses comparables.',
         monthlyTrend,
-        `EVALUATE\nCALCULATETABLE(\n    SUMMARIZECOLUMNS(\n        'Calendar'[Año#Mes],\n        'Calendar'[AñoMesCorto],\n        "Ventas", SUM('Invoices'[Bottles Sold])\n    ),\n    'Calendar'[#Año] = 2021\n)\nORDER BY 'Calendar'[Año#Mes] ASC`,
+        DAX.monthlyTrend,
       ],
     ],
   },
@@ -265,13 +284,13 @@ const CONVERSATIONS: { title: string; turns: [string, string, Card | null, strin
         'Top categorías por botellas vendidas en 2021',
         'Los whiskies canadienses lideran con 1.02 M de botellas, seguidos de los vodkas 80 proof. Las cuatro primeras categorías concentran algo más de la mitad del volumen.',
         topCategories,
-        `EVALUATE\nTOPN(\n    10,\n    CALCULATETABLE(\n        SUMMARIZECOLUMNS(\n            'Items'[Category Name],\n            "Ventas", SUM('Invoices'[Bottles Sold])\n        ),\n        'Calendar'[#Año] = 2021\n    ),\n    [Ventas], DESC\n)`,
+        DAX.topCategories,
       ],
       [
         'Ponlo en un quesito',
         'Aquí tienes la misma información como distribución.',
         distribution,
-        `EVALUATE\nCALCULATETABLE(\n    SUMMARIZECOLUMNS(\n        'Items'[Category Name],\n        "Ventas", SUM('Invoices'[Bottles Sold])\n    ),\n    'Calendar'[#Año] = 2021\n)`,
+        DAX.distribution,
       ],
     ],
   },
@@ -282,7 +301,7 @@ const CONVERSATIONS: { title: string; turns: [string, string, Card | null, strin
         'Compara las botellas vendidas por mes entre 2020 y 2021',
         '2021 supera a 2020 en todos los meses. La diferencia se abre a partir de junio y llega a su máximo en noviembre.',
         yearOverYear,
-        `EVALUATE\nCALCULATETABLE(\n    SUMMARIZECOLUMNS(\n        'Calendar'[#Mes],\n        'Calendar'[Mes],\n        'Calendar'[#Año],\n        "Ventas", SUM('Invoices'[Bottles Sold])\n    ),\n    'Calendar'[#Año] IN {2020, 2021}\n)\nORDER BY 'Calendar'[#Mes] ASC, 'Calendar'[#Año] ASC`,
+        DAX.yearOverYear,
       ],
     ],
   },
@@ -325,7 +344,7 @@ async function main() {
   let y = 0;
   let rowHeight = 0;
 
-  for (const [card, query] of WIDGETS) {
+  for (const [card, query, dax] of WIDGETS) {
     const size = DEFAULT_WIDGET_SIZE[card.kind];
 
     if (x + size.width > 12) {
@@ -338,6 +357,7 @@ async function main() {
       dashboardId: dashboard.id,
       card,
       query,
+      dax,
       x,
       y,
       width: size.width,

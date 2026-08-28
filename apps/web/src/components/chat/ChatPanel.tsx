@@ -1,12 +1,13 @@
 import { useChat } from '@ai-sdk/react';
 import type { Card, CardPart, Locale, Message } from '@powerbia/contracts';
-import { IconPin, IconSend2 } from '@tabler/icons-react';
+import { IconPin } from '@tabler/icons-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { DefaultChatTransport, type UIMessage } from 'ai';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { keys } from '../../lib/queries.ts';
 import { CardPanel } from '../cards/CardView.tsx';
+import { Prompt } from '../Prompt.tsx';
 import { DaxViewer } from './DaxViewer.tsx';
 
 export type ChatUIMessage = UIMessage<
@@ -52,7 +53,7 @@ interface Props {
   conversationId: string | null;
   history: readonly Message[];
   onConversationCreated: (id: string) => void;
-  onPin?: (card: Card, query: string) => void;
+  onPin?: (card: Card, query: string, dax: string | null) => void;
 }
 
 export function ChatPanel({
@@ -65,8 +66,6 @@ export function ChatPanel({
 }: Props) {
   const { t } = useTranslation();
   const client = useQueryClient();
-  const [input, setInput] = useState('');
-  const lastQuestion = useRef('');
   const bottom = useRef<HTMLDivElement>(null);
 
   const initialMessages = useMemo(() => toUIMessages(history), [history]);
@@ -121,13 +120,28 @@ export function ChatPanel({
     bottom.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
   }, [questionCount]);
 
+  /*
+   * The question each answer came from — the user turn just before it. Pinning
+   * used to attach whatever was typed last, which was wrong for every card but
+   * the newest one, and empty for a conversation replayed from history.
+   */
+  const questionFor = useMemo(() => {
+    const questions = new Map<string, string>();
+    let question = '';
+
+    for (const message of messages) {
+      if (message.role === 'user') question = textOf(message);
+      else questions.set(message.id, question);
+    }
+
+    return questions;
+  }, [messages]);
+
   const send = useCallback(
     (text: string) => {
       const trimmed = text.trim();
       if (!trimmed || busy) return;
 
-      lastQuestion.current = trimmed;
-      setInput('');
       void sendMessage({ text: trimmed });
     },
     [busy, sendMessage],
@@ -191,7 +205,8 @@ export function ChatPanel({
                           title={t('chat.pinToDashboard')}
                           aria-label={t('chat.pinToDashboard')}
                           onClick={() => {
-                            if (payload.card) onPin(payload.card, lastQuestion.current);
+                            if (payload.card)
+                              onPin(payload.card, questionFor.get(message.id) ?? '', payload.dax);
                           }}
                         >
                           <IconPin size={16} stroke={1.75} />
@@ -224,33 +239,7 @@ export function ChatPanel({
       </div>
 
       <div className="border-base-300 shrink-0 border-t p-4">
-        <div className="flex items-end gap-2">
-          <textarea
-            className="textarea textarea-bordered max-h-40 min-h-12 w-full resize-none"
-            placeholder={t('chat.placeholder')}
-            value={input}
-            disabled={busy}
-            rows={1}
-            onChange={(event) => setInput(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter' && !event.shiftKey) {
-                event.preventDefault();
-                send(input);
-              }
-            }}
-          />
-          <button
-            type="button"
-            className="btn btn-primary btn-square"
-            title={t('chat.send')}
-            aria-label={t('chat.send')}
-            disabled={busy || !input.trim()}
-            onClick={() => send(input)}
-          >
-            <IconSend2 size={18} stroke={1.75} />
-          </button>
-        </div>
-        <p className="text-base-content/50 mt-1 text-[11px]">{t('chat.hint')}</p>
+        <Prompt onSubmit={send} busy={busy} label={t('chat.send')} />
       </div>
     </div>
   );

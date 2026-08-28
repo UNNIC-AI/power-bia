@@ -7,7 +7,14 @@ import type {
   Widget,
 } from '@powerbia/contracts';
 import { DEFAULT_WIDGET_SIZE } from '@powerbia/contracts';
-import { IconLock, IconLockOpen, IconPencil, IconRefresh, IconX } from '@tabler/icons-react';
+import {
+  IconLock,
+  IconLockOpen,
+  IconPencil,
+  IconPlus,
+  IconRefresh,
+  IconX,
+} from '@tabler/icons-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import GridLayout, { type Layout, useContainerWidth } from 'react-grid-layout';
 import { useTranslation } from 'react-i18next';
@@ -19,6 +26,7 @@ import {
   useUpdateWidget,
 } from '../../lib/queries.ts';
 import { CardView } from '../cards/CardView.tsx';
+import { Prompt } from '../Prompt.tsx';
 
 const COLUMNS = 12;
 const ROW_HEIGHT = 40;
@@ -34,7 +42,13 @@ function asChartType(kind: Card['kind']): ChartType | null {
 function collectFilters(widgets: readonly Widget[]): FilterSelection[] {
   return widgets.flatMap((widget) =>
     widget.card.kind === 'filter' && widget.card.selected.length > 0
-      ? [{ table: widget.card.table, column: widget.card.column, values: widget.card.selected }]
+      ? [
+          {
+            table: widget.card.table,
+            column: widget.card.column,
+            values: widget.card.selected,
+          },
+        ]
       : [],
   );
 }
@@ -65,7 +79,13 @@ function WidgetFrame({
   const [draft, setDraft] = useState(widget.query ?? '');
 
   return (
-    <div className="card bg-base-100 border-base-300 flex h-full flex-col overflow-hidden border">
+    <div
+      className={`card bg-base-100 border-base-300 relative flex h-full flex-col border ${
+        // While editing, the panel is allowed to grow past the widget: a KPI is
+        // four rows tall and its DAX would otherwise be a two-line sliver.
+        editing ? 'z-20' : 'overflow-hidden'
+      }`}
+    >
       <div className="widget-drag-handle border-base-300 flex cursor-move items-center gap-1 border-b px-3 py-1.5">
         <span className="flex-1 truncate text-xs font-semibold" title={widget.card.title ?? ''}>
           {widget.card.title ?? widget.card.kind}
@@ -128,9 +148,9 @@ function WidgetFrame({
 
       <div className="min-h-0 flex-1 p-3">
         {editing ? (
-          <div className="flex h-full flex-col gap-2">
+          <div className="bg-base-100 border-base-300 rounded-box absolute inset-x-0 top-9 bottom-0 flex min-h-72 flex-col gap-2 border-x border-b p-3 shadow-lg">
             <textarea
-              className="textarea textarea-bordered min-h-0 flex-1 text-xs"
+              className="textarea textarea-bordered min-h-16 shrink-0 text-xs"
               value={draft}
               // Focus follows the editor the user just opened, rather than
               // autoFocus, which would also steal focus on mount.
@@ -145,6 +165,26 @@ function WidgetFrame({
                 }
               }}
             />
+
+            {/* The DAX sits under the question that generated it: editing one
+                shows what the other produced. */}
+            <div className="flex min-h-0 flex-1 flex-col gap-1">
+              <span className="text-base-content/50 text-[10px] font-semibold tracking-wide uppercase">
+                {t('dashboards.dax')}
+              </span>
+              {widget.dax ? (
+                <pre className="bg-base-200 min-h-0 flex-1 overflow-auto rounded-box p-2 text-[10px] leading-relaxed">
+                  <code>{widget.dax}</code>
+                </pre>
+              ) : (
+                <p className="text-base-content/50 text-[11px]">
+                  {CONTROL_KINDS.has(widget.card.kind)
+                    ? t('dashboards.daxNotApplicable')
+                    : t('dashboards.noDax')}
+                </p>
+              )}
+            </div>
+
             <div className="flex justify-end gap-2">
               <button
                 type="button"
@@ -186,7 +226,6 @@ export function DashboardCanvas({ dashboard, locale }: Props) {
   const { t } = useTranslation();
   const { width, containerRef } = useContainerWidth();
 
-  const [question, setQuestion] = useState('');
   const [busyWidgets, setBusyWidgets] = useState<ReadonlySet<string>>(new Set());
   const filterTimer = useRef<number | undefined>(undefined);
 
@@ -239,6 +278,7 @@ export function DashboardCanvas({ dashboard, locale }: Props) {
           await updateWidget.mutateAsync({
             widgetId: widget.id,
             card: result.card,
+            dax: result.dax,
             ...(query ? { query } : {}),
           });
         }
@@ -266,11 +306,7 @@ export function DashboardCanvas({ dashboard, locale }: Props) {
 
   const activeFilters = collectFilters(widgets);
 
-  const ask = async () => {
-    const text = question.trim();
-    if (!text) return;
-    setQuestion('');
-
+  const ask = async (text: string) => {
     const result = await runQuery.mutateAsync({
       datasetId: dashboard.datasetId,
       text,
@@ -294,6 +330,7 @@ export function DashboardCanvas({ dashboard, locale }: Props) {
     await addWidget.mutateAsync({
       card,
       query: result.card ? text : null,
+      dax: result.card ? result.dax : null,
       layout: { x: 0, y: nextY, width: size.width, height: size.height },
     });
   };
@@ -320,7 +357,10 @@ export function DashboardCanvas({ dashboard, locale }: Props) {
                     void updateWidget
                       .mutateAsync({
                         widgetId: widget.id,
-                        card: { ...filter, selected: [] },
+                        card: {
+                          ...filter,
+                          selected: [],
+                        },
                       })
                       .then(scheduleFilterRun);
                   }}
@@ -369,14 +409,20 @@ export function DashboardCanvas({ dashboard, locale }: Props) {
                   onEdit={(query) => void rerun(widget, activeFilters, query)}
                   onRemove={() => removeWidget.mutate(widget.id)}
                   onTogglePin={() =>
-                    updateWidget.mutate({ widgetId: widget.id, pinned: !widget.pinned })
+                    updateWidget.mutate({
+                      widgetId: widget.id,
+                      pinned: !widget.pinned,
+                    })
                   }
                   onFilterChange={(selected) => {
                     const filter = widget.card.kind === 'filter' ? widget.card : null;
                     if (!filter) return;
 
                     void updateWidget
-                      .mutateAsync({ widgetId: widget.id, card: { ...filter, selected } })
+                      .mutateAsync({
+                        widgetId: widget.id,
+                        card: { ...filter, selected },
+                      })
                       .then(scheduleFilterRun);
                   }}
                 />
@@ -387,26 +433,12 @@ export function DashboardCanvas({ dashboard, locale }: Props) {
       </div>
 
       <div className="border-base-300 shrink-0 border-t p-3 print:hidden">
-        <div className="flex gap-2">
-          <input
-            className="input input-bordered input-sm w-full"
-            placeholder={t('dashboards.askPlaceholder')}
-            value={question}
-            disabled={runQuery.isPending}
-            onChange={(event) => setQuestion(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter') void ask();
-            }}
-          />
-          <button
-            type="button"
-            className="btn btn-primary btn-sm"
-            disabled={runQuery.isPending || !question.trim()}
-            onClick={() => void ask()}
-          >
-            {runQuery.isPending ? <span className="loading loading-spinner loading-xs" /> : '+'}
-          </button>
-        </div>
+        <Prompt
+          onSubmit={(text) => void ask(text)}
+          busy={runQuery.isPending}
+          icon={<IconPlus size={18} stroke={1.75} />}
+          label={t('dashboards.add')}
+        />
       </div>
     </div>
   );

@@ -199,6 +199,8 @@ export const widgets = pgTable(
       .references(() => dashboards.id, { onDelete: 'cascade' }),
     card: jsonb('card').$type<Card>().notNull(),
     query: text('query'),
+    /** The DAX the question produced, so the edit panel can show prompt and DAX together. */
+    dax: text('dax'),
     x: integer('x').notNull(),
     y: integer('y').notNull(),
     width: integer('width').notNull(),

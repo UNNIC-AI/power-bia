@@ -132,8 +132,12 @@ export function useAddWidget(dashboardId: string) {
   const client = useQueryClient();
 
   return useMutation({
-    mutationFn: (body: { card: Card; query: string | null; layout: WidgetLayout }) =>
-      api.post<Widget>(`/dashboards/${dashboardId}/widgets`, body),
+    mutationFn: (body: {
+      card: Card;
+      query: string | null;
+      dax: string | null;
+      layout: WidgetLayout;
+    }) => api.post<Widget>(`/dashboards/${dashboardId}/widgets`, body),
     onSuccess: () => {
       void client.invalidateQueries({ queryKey: keys.dashboard(dashboardId) });
       void client.invalidateQueries({ queryKey: keys.dashboards });
@@ -148,7 +152,7 @@ export function useUpdateWidget(dashboardId: string) {
     mutationFn: ({
       widgetId,
       ...body
-    }: { widgetId: string } & Partial<Pick<Widget, 'card' | 'query' | 'pinned'>>) =>
+    }: { widgetId: string } & Partial<Pick<Widget, 'card' | 'query' | 'dax' | 'pinned'>>) =>
       api.patch<Widget>(`/dashboards/${dashboardId}/widgets/${widgetId}`, body),
     onSuccess: () => client.invalidateQueries({ queryKey: keys.dashboard(dashboardId) }),
   });

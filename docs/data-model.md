@@ -59,12 +59,16 @@ yet** — see [todo.md](./todo.md).
 | Table | Notes |
 |---|---|
 | `dashboards` | scoped by `user_id` |
-| `widgets` | `card` (JSONB), **`query`**, `x`/`y`/`width`/`height` in grid cells, `pinned` |
+| `widgets` | `card` (JSONB), **`query`**, `dax`, `x`/`y`/`width`/`height` in grid cells, `pinned` |
 
 `widgets.query` is the natural-language question that produced the card. It means a
 dashboard can be **recomputed from its questions** rather than serving whatever
 numbers happened to be cached in its JSON. The MVP stored only the card, so
 dashboards silently went stale; it had an auto-refresh hack for table widgets only.
+
+`widgets.dax` is the DAX that question generated. The widget's edit panel shows the
+two together, so a chart on a dashboard can be traced back to both the question
+and the query it became.
 
 Layout units are react-grid-layout cells on a 12-column grid, not pixels.
 

@@ -14,6 +14,8 @@ export const widgetSchema = z.object({
   card: cardSchema,
   /** The question that produced this card, so the widget can be recomputed. */
   query: z.string().nullable(),
+  /** The DAX that question generated, shown next to it in the edit panel. */
+  dax: z.string().nullable(),
   layout: widgetLayoutSchema,
   pinned: z.boolean(),
 });
@@ -40,12 +42,14 @@ export const createDashboardSchema = z.object({
 export const createWidgetSchema = z.object({
   card: cardSchema,
   query: z.string().nullable().default(null),
+  dax: z.string().nullable().default(null),
   layout: widgetLayoutSchema,
 });
 
 export const updateWidgetSchema = z.object({
   card: cardSchema.optional(),
   query: z.string().nullable().optional(),
+  dax: z.string().nullable().optional(),
   layout: widgetLayoutSchema.optional(),
   pinned: z.boolean().optional(),
 });

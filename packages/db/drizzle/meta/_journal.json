@@ -8,6 +8,13 @@
       "when": 1786615791297,
       "tag": "0000_friendly_payback",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1787923801522,
+      "tag": "0001_clear_warbound",
+      "breakpoints": true
     }
   ]
 }

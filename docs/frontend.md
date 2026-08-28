@@ -14,7 +14,7 @@ login.tsx               Sign in / register (one form, toggled)
 _authed.tsx             Auth guard + app shell (nav, dataset strip, theme, locale, logout)
 _authed/index.tsx       redirect → /chat
 _authed/chat.tsx        Conversation sidebar + ChatPanel
-_authed/dashboards.tsx  Dashboard sidebar + DashboardCanvas
+_authed/dashboards.tsx  View sidebar + DashboardCanvas
 ```
 
 Selection lives in **typed search params** rather than path params: `/chat?c=<id>`
@@ -22,6 +22,10 @@ and `/dashboards?d=<id>`. Fewer route files, still deep-linkable. Note that
 `validateSearch` declaring `c: string | undefined` means every `Link` and
 `navigate` must pass the key explicitly — `search={{ c: undefined }}`, not
 `search={{}}`, which is a type error.
+
+The two tabs read **Chat** and **Views**. The route paths and the `dashboards`
+i18n namespace keep the older name — renaming them buys nothing and breaks every
+existing link.
 
 `ChatPanel` is remounted to switch conversations, which replays that
 conversation's history as the initial messages — `useChat` reads `messages` only
@@ -45,6 +49,17 @@ typed fetch wrapper that throws `ApiError` with the server's message.
 
 No global client state library. Theme is a small context (`lib/theme-context.tsx`),
 locale is i18next, everything else is server state or local component state.
+
+## The question box
+
+Both screens ask questions through the same component, `components/Prompt.tsx`:
+a one-row textarea capped at `max-h-40`, Enter to submit and Shift+Enter for a
+newline, with the button showing a spinner while a request is in flight. It owns
+the draft text and clears it on submit, so neither caller keeps input state.
+
+Only the button differs: chat sends a message, a view adds a widget, so the icon
+and its label are props. The placeholder is not — it reads `prompt.placeholder`
+itself, which is what keeps the two screens identical.
 
 ## Destructive actions
 
@@ -172,6 +187,12 @@ in one click. Export is `window.print()` with `print:hidden` on the chrome.
 
 Asking a question in the dashboard's own input creates a widget, or a `note`
 widget when the pipeline returns prose without a card.
+
+The pencil opens the widget's edit panel: the question on top, the DAX it
+generated underneath. The panel keeps a minimum height and overlays whatever is
+below it, because a KPI widget is four rows tall and would otherwise squeeze the
+DAX into a sliver. Running the edited question stores the new DAX alongside the
+new card.
 
 ## i18n
 

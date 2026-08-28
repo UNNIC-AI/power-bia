@@ -25,6 +25,7 @@ function toWidget(row: WidgetRow): Widget {
     id: row.id,
     card: row.card,
     query: row.query,
+    dax: row.dax,
     pinned: row.pinned,
     layout: { x: row.x, y: row.y, width: row.width, height: row.height },
   };
@@ -112,10 +113,10 @@ export async function dashboardRoutes(app: FastifyInstance) {
         return reply.code(404).send({ message: 'Dashboard not found' });
       }
 
-      const { card, query, layout } = request.body;
+      const { card, query, dax, layout } = request.body;
       const [widget] = await app.db
         .insert(schema.widgets)
-        .values({ dashboardId: request.params.id, card, query, ...layout })
+        .values({ dashboardId: request.params.id, card, query, dax, ...layout })
         .returning();
       if (!widget) return reply.code(500).send({ message: 'Could not create widget' });
 
