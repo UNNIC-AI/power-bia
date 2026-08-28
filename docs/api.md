@@ -1,3 +1,17 @@
+| POST | `/` | `{ name, datasetId }` |
+| PATCH | `/:id` | `{ name }` — renames it by hand |
+| POST | `/:id/name` | `{ locale }` — regenerates the name from the widgets it holds. A view with none keeps its current name |
+| GET | `/` | Summaries with widget counts and `createdAt` || GET | `/:id` | With all messages, oldest first. 404 if not owned |
+| PATCH | `/:id` | `{ title }` — renames it by hand |
+| POST | `/:id/title` | `{ locale }` — regenerates the title from the thread. 502 if the model call fails |
+| DELETE | `/:id` | Cascades to messages |
+
+A conversation is inserted with its first message as a placeholder title, and the
+real one is generated from the first exchange before the answer stream closes —
+so the sidebar shows it on the refetch the client already fires on finish. If that
+call fails the placeholder stands; the answer is never at risk. `POST /:id/title`
+is the same generation on demand, for a thread that has moved on from what it
+started as.
 # HTTP API
 
 Fastify with `fastify-type-provider-zod`. Every body, param and response is
@@ -50,15 +64,26 @@ is how refresh preserves the shape the user chose.
 |---|---|---|
 | GET | `/` | The current user's conversations, newest first |
 | GET | `/:id` | With all messages, oldest first. 404 if not owned |
+| PATCH | `/:id` | `{ title }` — renames it by hand |
+| POST | `/:id/title` | `{ locale }` — regenerates the title from the thread. 502 if the model call fails |
 | DELETE | `/:id` | Cascades to messages |
+
+A conversation is inserted with its first message as a **placeholder** title, and
+the real one is generated from the first exchange before the answer stream closes
+— which is what makes the sidebar show it on the refetch the client already fires
+on finish. If that call fails the placeholder stands: titling never takes the
+answer down with it. `POST /:id/title` is the same generation on demand, for a
+thread that has moved on from what it started as.
 
 ### Dashboards — `/api/dashboards`
 
 | Method | Path | Notes |
 |---|---|---|
-| GET | `/` | Summaries with widget counts |
+| GET | `/` | Summaries with widget counts and `createdAt` |
 | GET | `/:id` | With widgets. 404 if not owned |
 | POST | `/` | `{ name, datasetId }` |
+| PATCH | `/:id` | `{ name }` — renames it by hand |
+| POST | `/:id/name` | `{ locale }` — regenerates the name from the widgets it holds; a view with none keeps its current name |
 | DELETE | `/:id` | Cascades to widgets |
 | POST | `/:id/widgets` | `{ card, query, dax, layout }` — the card is validated against the union |
 | PATCH | `/:id/widgets/:widgetId` | Partial: `card`, `query`, `dax`, `pinned`, `layout` |

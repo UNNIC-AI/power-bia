@@ -8,12 +8,13 @@ import type {
 } from '@powerbia/contracts';
 import { DEFAULT_WIDGET_SIZE } from '@powerbia/contracts';
 import {
+  IconDots,
   IconLock,
   IconLockOpen,
   IconPencil,
   IconPlus,
   IconRefresh,
-  IconX,
+  IconTrash,
 } from '@tabler/icons-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import GridLayout, { type Layout, useContainerWidth } from 'react-grid-layout';
@@ -25,8 +26,11 @@ import {
   useSaveLayouts,
   useUpdateWidget,
 } from '../../lib/queries.ts';
+import { ConfirmDialog } from '../ConfirmDialog.tsx';
 import { CardView } from '../cards/CardView.tsx';
+import { Menu, MenuItem } from '../Menu.tsx';
 import { Prompt } from '../Prompt.tsx';
+import { Tooltip } from '../Tooltip.tsx';
 
 const COLUMNS = 12;
 const ROW_HEIGHT = 40;
@@ -76,6 +80,7 @@ function WidgetFrame({
 }: WidgetFrameProps) {
   const { t } = useTranslation();
   const [editing, setEditing] = useState(false);
+  const [confirmingRemove, setConfirmingRemove] = useState(false);
   const [draft, setDraft] = useState(widget.query ?? '');
 
   return (
@@ -91,55 +96,68 @@ function WidgetFrame({
           {widget.card.title ?? widget.card.kind}
         </span>
 
-        <button
-          type="button"
-          className={`btn btn-ghost btn-square btn-xs ${widget.pinned ? 'text-primary' : ''}`}
-          title={widget.pinned ? t('dashboards.unpin') : t('dashboards.pin')}
-          aria-label={widget.pinned ? t('dashboards.unpin') : t('dashboards.pin')}
-          onClick={onTogglePin}
-        >
-          {widget.pinned ? (
-            <IconLock size={14} stroke={1.75} />
-          ) : (
-            <IconLockOpen size={14} stroke={1.75} />
-          )}
-        </button>
-
-        {widget.query && (
-          <>
+        {/* The header doubles as the drag handle, so its controls keep their
+            pointer down to themselves: otherwise using one drags the widget. */}
+        {widget.pinned && (
+          <Tooltip label={t('dashboards.unpin')}>
             <button
               type="button"
-              className="btn btn-ghost btn-square btn-xs"
-              title={t('dashboards.refresh')}
-              aria-label={t('dashboards.refresh')}
-              onClick={onRefresh}
+              className="btn btn-ghost btn-square btn-xs text-primary"
+              aria-label={t('dashboards.unpin')}
+              onPointerDown={(event) => event.stopPropagation()}
+              onMouseDown={(event) => event.stopPropagation()}
+              onClick={onTogglePin}
             >
-              <IconRefresh size={14} stroke={1.75} />
+              <IconLock size={14} stroke={1.75} />
             </button>
-            <button
-              type="button"
-              className="btn btn-ghost btn-square btn-xs"
-              title={t('dashboards.edit')}
-              aria-label={t('dashboards.edit')}
-              onClick={() => {
-                setDraft(widget.query ?? '');
-                setEditing(true);
-              }}
-            >
-              <IconPencil size={14} stroke={1.75} />
-            </button>
-          </>
+          </Tooltip>
         )}
 
-        <button
-          type="button"
-          className="btn btn-ghost btn-square btn-xs"
-          title={t('dashboards.remove')}
-          aria-label={t('dashboards.remove')}
-          onClick={onRemove}
+        <Menu
+          label={t('common.actions')}
+          trigger={
+            <button
+              type="button"
+              className="btn btn-ghost btn-square btn-xs cursor-pointer"
+              onPointerDown={(event) => event.stopPropagation()}
+              onMouseDown={(event) => event.stopPropagation()}
+            >
+              <IconDots size={14} stroke={1.75} />
+            </button>
+          }
         >
-          <IconX size={14} stroke={1.75} />
-        </button>
+          <MenuItem onSelect={onTogglePin}>
+            {widget.pinned ? (
+              <IconLockOpen size={14} stroke={1.75} />
+            ) : (
+              <IconLock size={14} stroke={1.75} />
+            )}
+            {widget.pinned ? t('dashboards.unpin') : t('dashboards.pin')}
+          </MenuItem>
+
+          {widget.query && (
+            <>
+              <MenuItem onSelect={onRefresh}>
+                <IconRefresh size={14} stroke={1.75} />
+                {t('dashboards.refresh')}
+              </MenuItem>
+              <MenuItem
+                onSelect={() => {
+                  setDraft(widget.query ?? '');
+                  setEditing(true);
+                }}
+              >
+                <IconPencil size={14} stroke={1.75} />
+                {t('dashboards.edit')}
+              </MenuItem>
+            </>
+          )}
+
+          <MenuItem destructive onSelect={() => setConfirmingRemove(true)}>
+            <IconTrash size={14} stroke={1.75} />
+            {t('dashboards.remove')}
+          </MenuItem>
+        </Menu>
       </div>
 
       {widget.card.subtitle && (
@@ -213,6 +231,17 @@ function WidgetFrame({
           <CardView card={widget.card} locale={locale} onFilterChange={onFilterChange} />
         )}
       </div>
+
+      <ConfirmDialog
+        open={confirmingRemove}
+        title={t('dashboards.confirmRemoveTitle')}
+        body={t('dashboards.confirmRemoveBody', {
+          title: widget.card.title ?? widget.card.kind,
+        })}
+        confirmLabel={t('dashboards.remove')}
+        onConfirm={onRemove}
+        onCancel={() => setConfirmingRemove(false)}
+      />
     </div>
   );
 }
@@ -432,14 +461,12 @@ export function DashboardCanvas({ dashboard, locale }: Props) {
         )}
       </div>
 
-      <div className="border-base-300 shrink-0 border-t p-3 print:hidden">
-        <Prompt
-          onSubmit={(text) => void ask(text)}
-          busy={runQuery.isPending}
-          icon={<IconPlus size={18} stroke={1.75} />}
-          label={t('dashboards.add')}
-        />
-      </div>
+      <Prompt
+        onSubmit={(text) => void ask(text)}
+        busy={runQuery.isPending}
+        icon={<IconPlus size={18} stroke={1.75} />}
+        label={t('dashboards.add')}
+      />
     </div>
   );
 }

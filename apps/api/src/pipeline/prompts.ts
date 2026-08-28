@@ -303,6 +303,17 @@ Reglas:
     con desglose por las dimensiones disponibles y evolución temporal.
   - No menciones detalles técnicos.`;
 
+export const TITLER_ROLE = `Tu tarea: titular una conversación o una vista (un panel de gráficos), a partir de lo que
+contiene.
+
+Reglas:
+  - Máximo 6 palabras y 60 caracteres. Sin punto final, sin comillas, sin emojis.
+  - Titula el ASUNTO: métrica, dimensión y periodo. Nunca la forma ("gráfico de…",
+    "consulta sobre…", "análisis de…").
+  - No repitas el nombre del modelo de datos: se sabe por el contexto.
+  - Mayúscula inicial solo en la primera palabra y en los nombres propios.
+  - Si el contenido es trivial (un saludo, una prueba), pon un título genérico corto.`;
+
 export const FILTER_IDENTIFIER_ROLE = `Tu tarea: identificar qué columna del modelo quiere filtrar el usuario.
 
 Reglas:

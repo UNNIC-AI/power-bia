@@ -58,6 +58,10 @@ catalog:
   # package is ESM with `sideEffects: false`, so Rollup drops the ~5.9k unused
   # icons from the bundle. Only the dev-server prebundle pays for the full set.
   "@tabler/icons-react": ^3.46.0
+  # The unified `radix-ui` package, not the per-primitive `@radix-ui/react-*`
+  # ones: one version to bump, and one copy of the shared internals instead of
+  # a dozen. Primitives are unstyled, so DaisyUI classes go on their parts.
+  radix-ui: ^1.6.7
   vite: ^8.2.1
   "@vitejs/plugin-react": ^6.0.5
 

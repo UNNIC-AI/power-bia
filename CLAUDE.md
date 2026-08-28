@@ -41,7 +41,7 @@ Plan original: `~/.config/claude/plans/functional-snuggling-micali.md`
   fuera del devshell.
 - **Backend:** Fastify 5 + AI SDK 7 + Drizzle + Postgres 17
 - **Gateway DAX:** .NET 10 minimal API sobre ADOMD.NET (XMLA)
-- **Frontend:** React 19 + Tailwind 4 + DaisyUI 5 + TanStack Router/Query + Recharts
+- **Frontend:** React 19 + Tailwind 4 + DaisyUI 5 + Radix primitives + TanStack Router/Query + Recharts
 - **Lint/format:** Biome. **Tests:** Vitest.
 
 ### AI SDK 7 — diferencias que importan

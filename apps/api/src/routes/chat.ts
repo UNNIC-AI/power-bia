@@ -16,6 +16,7 @@ import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { requireUser } from '../app.js';
 import { appendMessage, ensureConversation, loadHistory } from '../conversations/store.js';
 import { loadConnection, loadDatasetContext } from '../datasets/context.js';
+import { retitleConversation } from '../pipeline/retitle.js';
 import { runPipeline } from '../pipeline/run.js';
 
 export type ChatUIMessage = UIMessage<
@@ -47,7 +48,7 @@ export async function chatRoutes(app: FastifyInstance) {
     ]);
     if (!dataset || !connection) return reply.code(404).send({ message: 'Dataset not found' });
 
-    const conversation = await ensureConversation({
+    const { conversation, created } = await ensureConversation({
       db: app.db,
       userId: user.id,
       datasetId,
@@ -109,6 +110,25 @@ export async function chatRoutes(app: FastifyInstance) {
           decision: outcome.decision,
           resultColumns: outcome.resultColumns,
         });
+
+        /*
+         * Titling the new conversation before the stream closes is what makes
+         * the sidebar show the real title on the refetch the client fires on
+         * finish. It must never take the answer down with it, hence the catch:
+         * the placeholder title is already in place.
+         */
+        if (created) {
+          try {
+            await retitleConversation({
+              db: app.db,
+              conversationId: conversation.id,
+              datasetId,
+              locale,
+            });
+          } catch (error) {
+            app.log.warn({ err: error, conversationId: conversation.id }, 'auto-title failed');
+          }
+        }
       },
     });
 

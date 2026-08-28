@@ -18,6 +18,7 @@
     "@tanstack/react-router": "catalog:",
     "ai": "catalog:",
     "i18next": "catalog:",
+    "radix-ui": "catalog:",
     "react": "catalog:",
     "react-dom": "catalog:",
     "react-grid-layout": "catalog:",

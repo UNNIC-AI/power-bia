@@ -22,11 +22,12 @@ import {
   GENERATOR_ROLE,
   REPAIRER_ROLE,
   ROUTER_ROLE,
+  TITLER_ROLE,
   VIZ_DECIDER_ROLE,
   WRITER_ROLE,
 } from './prompts.js';
 
-const openai = createOpenAI({ apiKey: env.OPENAI_API_KEY });
+const openai = createOpenAI({ apiKey: env.OPENAI_API_KEY, baseURL: env.OPENAI_BASE_URL });
 const model = openai(env.LLM_MODEL);
 
 const DETERMINISTIC = { temperature: 0 } as const;
@@ -301,4 +302,31 @@ export async function resolveFilterColumn(options: {
   });
 
   return output;
+}
+
+const TITLE_LIMIT = 60;
+
+/**
+ * Titles both conversations and views. The MVP used the first question verbatim,
+ * which read as a wall of half-sentences in the sidebar once a chat moved on
+ * from what it started as.
+ */
+export async function generateTitle(options: {
+  context: string;
+  dataset: DatasetContext;
+  locale: Locale;
+}): Promise<string> {
+  const { context, dataset, locale } = options;
+
+  const { output } = await generateText({
+    model,
+    ...DETERMINISTIC,
+    instructions: buildInstructions({ role: TITLER_ROLE, dataset, locale }),
+    prompt: context,
+    output: Output.object({ schema: z.object({ title: z.string() }) }),
+  });
+
+  // The length rule is in the prompt, but a title is stored and shown either
+  // way, so it is enforced here rather than trusted.
+  return output.title.trim().slice(0, TITLE_LIMIT);
 }

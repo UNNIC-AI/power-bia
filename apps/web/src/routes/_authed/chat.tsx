@@ -1,11 +1,11 @@
 import type { Card } from '@powerbia/contracts';
 import { DEFAULT_WIDGET_SIZE } from '@powerbia/contracts';
-import { IconTrash } from '@tabler/icons-react';
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ConfirmDialog } from '../../components/ConfirmDialog.tsx';
 import { ChatPanel } from '../../components/chat/ChatPanel.tsx';
+import { Sidebar } from '../../components/Sidebar.tsx';
 import { formatDay } from '../../lib/format.ts';
 import {
   useAddWidget,
@@ -14,6 +14,8 @@ import {
   useDashboards,
   useDatasets,
   useDeleteConversation,
+  useRegenerateConversationTitle,
+  useRenameConversation,
 } from '../../lib/queries.ts';
 import { useActiveLocale } from '../_authed.tsx';
 
@@ -42,6 +44,8 @@ function ChatRoute() {
   const datasets = useDatasets();
   const conversations = useConversations();
   const conversation = useConversation(conversationId ?? null);
+  const renameConversation = useRenameConversation();
+  const regenerateTitle = useRegenerateConversationTitle();
   const deleteConversation = useDeleteConversation();
   const dashboards = useDashboards();
 
@@ -125,51 +129,22 @@ function ChatRoute() {
 
   return (
     <div className="flex h-full min-h-0">
-      <aside className="bg-base-100 border-base-300 hidden w-64 shrink-0 flex-col border-r md:flex">
-        <div className="p-3">
-          <button
-            type="button"
-            className="btn btn-primary btn-sm w-full"
-            onClick={() => select(undefined)}
-          >
-            {t('chat.newQuery')}
-          </button>
-        </div>
-
-        <ul className="menu menu-sm min-h-0 flex-1 flex-nowrap overflow-y-auto">
-          {conversations.data?.length === 0 && (
-            <li className="text-base-content/50 px-3 py-2 text-xs">{t('chat.noConversations')}</li>
-          )}
-          {conversations.data?.map((entry) => (
-            <li key={entry.id}>
-              <button
-                type="button"
-                className={entry.id === conversationId ? 'menu-active' : ''}
-                onClick={() => select(entry.id)}
-              >
-                <span className="flex-1 truncate text-left" title={entry.title}>
-                  {entry.title}
-                </span>
-                <span className="text-base-content/40 text-[10px]">
-                  {formatDay(entry.updatedAt, locale)}
-                </span>
-                <button
-                  type="button"
-                  className="btn btn-soft hover:btn-error btn-square btn-xs"
-                  title={t('chat.delete')}
-                  aria-label={t('chat.delete')}
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    setPendingDelete({ id: entry.id, title: entry.title });
-                  }}
-                >
-                  <IconTrash size={14} stroke={1.75} />
-                </button>
-              </button>
-            </li>
-          ))}
-        </ul>
-      </aside>
+      <Sidebar
+        items={(conversations.data ?? []).map((entry) => ({
+          id: entry.id,
+          title: entry.title,
+          meta: t('common.updatedOn', { day: formatDay(entry.updatedAt, locale) }),
+        }))}
+        activeId={conversationId}
+        newLabel={t('chat.newQuery')}
+        emptyLabel={t('chat.noConversations')}
+        onNew={() => select(undefined)}
+        onSelect={select}
+        onRename={(id, title) => renameConversation.mutate({ id, title })}
+        onRegenerate={(id) => regenerateTitle.mutate({ id, locale })}
+        pendingId={regenerateTitle.isPending ? regenerateTitle.variables?.id : undefined}
+        onDelete={(item) => setPendingDelete({ id: item.id, title: item.title })}
+      />
 
       <section className="min-w-0 flex-1">
         {conversationId && !owned && !conversation.isSuccess ? (

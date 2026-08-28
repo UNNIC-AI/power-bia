@@ -32,12 +32,15 @@ export const dashboardSummarySchema = z.object({
   name: z.string(),
   datasetId: z.uuid(),
   widgetCount: z.number().int(),
+  createdAt: z.iso.datetime(),
 });
 
 export const createDashboardSchema = z.object({
   name: z.string().min(1).max(120),
   datasetId: z.uuid(),
 });
+
+export const renameDashboardSchema = z.object({ name: z.string().min(1).max(120) });
 
 export const createWidgetSchema = z.object({
   card: cardSchema,
@@ -64,6 +67,7 @@ export type Widget = z.infer<typeof widgetSchema>;
 export type Dashboard = z.infer<typeof dashboardSchema>;
 export type DashboardSummary = z.infer<typeof dashboardSummarySchema>;
 export type CreateDashboard = z.infer<typeof createDashboardSchema>;
+export type RenameDashboard = z.infer<typeof renameDashboardSchema>;
 export type CreateWidget = z.infer<typeof createWidgetSchema>;
 export type UpdateWidget = z.infer<typeof updateWidgetSchema>;
 export type UpdateLayouts = z.infer<typeof updateLayoutsSchema>;

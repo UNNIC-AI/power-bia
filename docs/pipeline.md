@@ -30,6 +30,13 @@ routeIntent ─┬─ conversation      → answerConversation (stream)
 | `repairDax` | `stages.ts` | structured, one retry only |
 | `answerData` / `answerConversation` | `stages.ts` | streamed prose |
 | `resolveFilterColumn` | `stages.ts` | structured |
+| `generateTitle` | `stages.ts` | structured, one short string |
+
+`generateTitle` sits outside the question pipeline: it runs once when a
+conversation gets its first answer, and again whenever a chat or a view is
+retitled from its row menu. `pipeline/retitle.ts` is the part that reads the
+content back from Postgres — the last turns of a thread, or the questions behind
+a view's widgets — so the automatic pass and the explicit one share one code path.
 
 ## Why the visualization is decided before the DAX exists
 

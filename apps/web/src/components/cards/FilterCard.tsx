@@ -2,6 +2,7 @@ import type { FilterCard as FilterCardType } from '@powerbia/contracts';
 import { IconX } from '@tabler/icons-react';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Tooltip } from '../Tooltip.tsx';
 
 interface Props {
   card: FilterCardType;
@@ -38,15 +39,16 @@ export function FilterCard({ card, onChange }: Props) {
           onChange={(event) => setSearch(event.target.value)}
         />
         {selected.length > 0 && (
-          <button
-            type="button"
-            className="btn btn-ghost btn-square btn-xs"
-            title={t('dashboards.clearFilter')}
-            aria-label={t('dashboards.clearFilter')}
-            onClick={() => onChange?.([])}
-          >
-            <IconX size={14} stroke={1.75} />
-          </button>
+          <Tooltip label={t('dashboards.clearFilter')}>
+            <button
+              type="button"
+              className="btn btn-ghost btn-square btn-xs"
+              aria-label={t('dashboards.clearFilter')}
+              onClick={() => onChange?.([])}
+            >
+              <IconX size={14} stroke={1.75} />
+            </button>
+          </Tooltip>
         )}
       </div>
 

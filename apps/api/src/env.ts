@@ -8,6 +8,8 @@ const envSchema = z.object({
   DATABASE_URL: z.string().min(1),
 
   OPENAI_API_KEY: z.string().min(1),
+  // Any OpenAI-compatible endpoint; defaults to OpenAI itself.
+  OPENAI_BASE_URL: z.url().default('https://api.openai.com/v1'),
   LLM_MODEL: z.string().default('gpt-4.1'),
 
   DAX_GATEWAY_URL: z.url(),

@@ -3,6 +3,8 @@ import { type Database, schema } from '@powerbia/db';
 import { and, desc, eq } from 'drizzle-orm';
 import type { HistoryEntry } from '../pipeline/stages.js';
 
+type ConversationRow = typeof schema.conversations.$inferSelect;
+
 const HISTORY_LIMIT = 5;
 const TITLE_LIMIT = 60;
 
@@ -15,18 +17,24 @@ export async function findConversation(db: Database, userId: string, conversatio
   });
 }
 
+/**
+ * The first message is only a placeholder title: the real one is generated from
+ * the exchange once the answer exists (see `pipeline/retitle.ts`). Keeping the
+ * placeholder means a conversation is never nameless, not even if that
+ * generation fails.
+ */
 export async function ensureConversation(options: {
   db: Database;
   userId: string;
   datasetId: string;
   conversationId: string | null;
   firstMessage: string;
-}) {
+}): Promise<{ conversation: ConversationRow; created: boolean }> {
   const { db, userId, datasetId, conversationId, firstMessage } = options;
 
   if (conversationId) {
     const existing = await findConversation(db, userId, conversationId);
-    if (existing) return existing;
+    if (existing) return { conversation: existing, created: false };
   }
 
   const [created] = await db
@@ -36,7 +44,7 @@ export async function ensureConversation(options: {
 
   if (!created) throw new Error('Could not create conversation');
 
-  return created;
+  return { conversation: created, created: true };
 }
 
 /**

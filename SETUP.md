@@ -43,6 +43,7 @@ with a precise message rather than failing later.
 | `NODE_ENV` | `development` | `production` sets the `secure` cookie flag, which then **requires HTTPS** |
 | `PORT` | `3000` | |
 | `WEB_ORIGIN` | `http://localhost:5173` | Drives CORS **and** the origin check on mutations — a wrong value blocks all writes |
+| `OPENAI_BASE_URL` | `https://api.openai.com/v1` | Any OpenAI-compatible endpoint — Azure OpenAI, OpenRouter, vLLM, Ollama |
 | `LLM_MODEL` | `gpt-4.1` | Must support strict structured outputs |
 | `POSTGRES_PASSWORD` | `powerbia` | Compose only; must agree with `DATABASE_URL` |
 

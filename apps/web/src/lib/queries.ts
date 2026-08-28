@@ -85,6 +85,30 @@ export function useConversation(id: string | null) {
   });
 }
 
+export function useRenameConversation() {
+  const client = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, title }: { id: string; title: string }) =>
+      api.patch<Conversation>(`/conversations/${id}`, { title }),
+    onSuccess: (conversation) => {
+      void client.invalidateQueries({ queryKey: keys.conversations });
+      void client.invalidateQueries({ queryKey: keys.conversation(conversation.id) });
+    },
+  });
+}
+
+/** Asks the model for a title from the thread itself, replacing the current one. */
+export function useRegenerateConversationTitle() {
+  const client = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, locale }: { id: string; locale: Locale }) =>
+      api.post<Conversation>(`/conversations/${id}/title`, { locale }),
+    onSuccess: () => client.invalidateQueries({ queryKey: keys.conversations }),
+  });
+}
+
 export function useDeleteConversation() {
   const client = useQueryClient();
 
@@ -115,6 +139,30 @@ export function useCreateDashboard() {
   return useMutation({
     mutationFn: (body: { name: string; datasetId: string }) =>
       api.post<Dashboard>('/dashboards', body),
+    onSuccess: () => client.invalidateQueries({ queryKey: keys.dashboards }),
+  });
+}
+
+export function useRenameDashboard() {
+  const client = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, name }: { id: string; name: string }) =>
+      api.patch<DashboardSummary>(`/dashboards/${id}`, { name }),
+    onSuccess: (dashboard) => {
+      void client.invalidateQueries({ queryKey: keys.dashboards });
+      void client.invalidateQueries({ queryKey: keys.dashboard(dashboard.id) });
+    },
+  });
+}
+
+/** The view's counterpart: a name generated from the widgets it holds. */
+export function useRegenerateDashboardName() {
+  const client = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, locale }: { id: string; locale: Locale }) =>
+      api.post<DashboardSummary>(`/dashboards/${id}/name`, { locale }),
     onSuccess: () => client.invalidateQueries({ queryKey: keys.dashboards }),
   });
 }

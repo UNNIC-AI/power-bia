@@ -1,9 +1,19 @@
 import type { Locale } from '@powerbia/contracts';
-import { IconMoon, IconSun } from '@tabler/icons-react';
-import { createFileRoute, Link, Outlet, useNavigate } from '@tanstack/react-router';
+import {
+  IconLanguage,
+  IconLayoutSidebarLeftCollapse,
+  IconLayoutSidebarLeftExpand,
+  IconLogout,
+  IconMoon,
+  IconSun,
+} from '@tabler/icons-react';
+import { createFileRoute, Outlet, useNavigate } from '@tanstack/react-router';
 import { useTranslation } from 'react-i18next';
-import { setLocale, storedLocale } from '../lib/i18n.ts';
+import { Menu, MenuItem, MenuSeparator } from '../components/Menu.tsx';
+import { Tooltip } from '../components/Tooltip.tsx';
+import { setLocale } from '../lib/i18n.ts';
 import { useDatasets, useLogout, useMe } from '../lib/queries.ts';
+import { useSidebar } from '../lib/sidebar-context.tsx';
 import { useTheme } from '../lib/theme-context.tsx';
 
 export const Route = createFileRoute('/_authed')({ component: AuthedLayout });
@@ -14,7 +24,9 @@ function AuthedLayout() {
   const me = useMe();
   const logout = useLogout();
   const datasets = useDatasets();
+  const locale = useActiveLocale();
   const { theme, toggle } = useTheme();
+  const sidebar = useSidebar();
 
   if (me.isLoading) {
     return (
@@ -34,28 +46,23 @@ function AuthedLayout() {
   return (
     <div className="bg-base-200 flex h-screen flex-col">
       <header className="navbar bg-base-100 border-base-300 min-h-0 shrink-0 gap-2 border-b px-4 py-1.5 print:hidden">
-        <span className="font-semibold">{t('appName')}</span>
+        <Tooltip label={sidebar.open ? t('nav.hideSidebar') : t('nav.showSidebar')}>
+          <button
+            type="button"
+            className="btn btn-ghost btn-square btn-sm"
+            aria-label={sidebar.open ? t('nav.hideSidebar') : t('nav.showSidebar')}
+            aria-expanded={sidebar.open}
+            onClick={sidebar.toggle}
+          >
+            {sidebar.open ? (
+              <IconLayoutSidebarLeftCollapse size={18} stroke={1.75} />
+            ) : (
+              <IconLayoutSidebarLeftExpand size={18} stroke={1.75} />
+            )}
+          </button>
+        </Tooltip>
 
-        <div role="tablist" className="tabs tabs-sm tabs-box ml-4">
-          <Link
-            to="/chat"
-            search={{ c: undefined }}
-            role="tab"
-            className="tab"
-            activeProps={{ className: 'tab tab-active' }}
-          >
-            {t('nav.chat')}
-          </Link>
-          <Link
-            to="/dashboards"
-            search={{ d: undefined }}
-            role="tab"
-            className="tab"
-            activeProps={{ className: 'tab tab-active' }}
-          >
-            {t('nav.dashboards')}
-          </Link>
-        </div>
+        <span className="font-semibold">{t('appName')}</span>
 
         <div className="flex-1" />
 
@@ -66,43 +73,38 @@ function AuthedLayout() {
           </span>
         )}
 
-        <button
-          type="button"
-          className="btn btn-ghost btn-xs"
-          onClick={() => setLocale(storedLocale() === 'es' ? 'en' : 'es')}
+        <Menu
+          header={me.data.email}
+          trigger={
+            <button type="button" className="btn btn-ghost btn-xs">
+              {me.data.displayName}
+            </button>
+          }
         >
-          {storedLocale().toUpperCase()}
-        </button>
+          <MenuItem onSelect={toggle}>
+            {theme === 'dark' ? (
+              <IconSun size={14} stroke={1.75} />
+            ) : (
+              <IconMoon size={14} stroke={1.75} />
+            )}
+            {theme === 'dark' ? t('common.lightMode') : t('common.darkMode')}
+          </MenuItem>
 
-        <button
-          type="button"
-          className="btn btn-ghost btn-square btn-xs"
-          title={theme === 'dark' ? t('common.lightMode') : t('common.darkMode')}
-          aria-label={theme === 'dark' ? t('common.lightMode') : t('common.darkMode')}
-          onClick={toggle}
-        >
-          {theme === 'dark' ? (
-            <IconSun size={16} stroke={1.75} />
-          ) : (
-            <IconMoon size={16} stroke={1.75} />
-          )}
-        </button>
+          {/* Two locales, so the item is named after the one it switches to. */}
+          <MenuItem onSelect={() => setLocale(locale === 'es' ? 'en' : 'es')}>
+            <IconLanguage size={14} stroke={1.75} />
+            {locale === 'es' ? 'English' : 'Español'}
+          </MenuItem>
 
-        <div className="dropdown dropdown-end">
-          <button type="button" className="btn btn-ghost btn-xs">
-            {me.data.displayName}
-          </button>
-          <ul className="dropdown-content menu bg-base-100 rounded-box border-base-300 z-10 w-40 border p-1 shadow-sm">
-            <li>
-              <button
-                type="button"
-                onClick={() => void logout.mutateAsync().then(() => navigate({ to: '/login' }))}
-              >
-                {t('auth.signOut')}
-              </button>
-            </li>
-          </ul>
-        </div>
+          <MenuSeparator />
+
+          <MenuItem
+            onSelect={() => void logout.mutateAsync().then(() => navigate({ to: '/login' }))}
+          >
+            <IconLogout size={14} stroke={1.75} />
+            {t('auth.signOut')}
+          </MenuItem>
+        </Menu>
       </header>
 
       <main className="min-h-0 flex-1">

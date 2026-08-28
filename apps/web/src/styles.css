@@ -8,12 +8,21 @@
 
 /* Shared radii across both themes. Unlayered on purpose: daisyUI emits its
    theme variables inside `@layer base`, so an unlayered rule wins without
-   having to replicate the plugin's `:root:has(...)` selectors. */
+   having to replicate the plugin's `:root:has(...)` selectors.
+
+   daisyUI splits radius into three scales — selectors (checkbox, toggle, badge),
+   fields (input, button, tab) and boxes (card, modal, menu). Holding them equal
+   is what makes a field, a card and a menu agree, so they all read one knob:
+   change `--radius-app` and every corner in the app follows. Components must not
+   set their own `rounded-*`; the only deliberate exceptions are the pills that
+   ask for `rounded-full`. */
 :root,
 [data-theme] {
-	--radius-selector: 0.5rem;
-	--radius-field: 0.25rem;
-	--radius-box: 0.5rem;
+	--radius-app: 0.5rem;
+
+	--radius-selector: var(--radius-app);
+	--radius-field: var(--radius-app);
+	--radius-box: var(--radius-app);
 }
 
 /* react-grid-layout ships its own stylesheet; these are the few rules it needs,

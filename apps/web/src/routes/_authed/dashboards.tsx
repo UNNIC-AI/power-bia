@@ -1,15 +1,18 @@
-import { IconPlus, IconTrash } from '@tabler/icons-react';
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ConfirmDialog } from '../../components/ConfirmDialog.tsx';
 import { DashboardCanvas } from '../../components/dashboard/DashboardCanvas.tsx';
+import { Sidebar } from '../../components/Sidebar.tsx';
+import { formatDay } from '../../lib/format.ts';
 import {
   useCreateDashboard,
   useDashboard,
   useDashboards,
   useDatasets,
   useDeleteDashboard,
+  useRegenerateDashboardName,
+  useRenameDashboard,
 } from '../../lib/queries.ts';
 import { useActiveLocale } from '../_authed.tsx';
 
@@ -29,9 +32,9 @@ function DashboardsRoute() {
   const datasets = useDatasets();
   const dashboards = useDashboards();
   const createDashboard = useCreateDashboard();
+  const renameDashboard = useRenameDashboard();
+  const regenerateName = useRegenerateDashboardName();
   const deleteDashboard = useDeleteDashboard();
-
-  const [name, setName] = useState('');
 
   /** Deleting is irreversible, so the row is held here until it is confirmed. */
   const [pendingDelete, setPendingDelete] = useState<{ id: string; name: string } | null>(null);
@@ -44,12 +47,16 @@ function DashboardsRoute() {
 
   const select = (id: string) => void navigate({ to: '/dashboards', search: { d: id } });
 
+  /*
+   * A view is created with a placeholder name and renamed from the row's menu,
+   * the way a new chat is titled after the fact. The alternative — a name field
+   * in the sidebar — is the one thing the two lists could not share.
+   */
   const create = async () => {
-    const trimmed = name.trim();
-    if (!trimmed) return;
-    setName('');
-
-    const created = await createDashboard.mutateAsync({ name: trimmed, datasetId });
+    const created = await createDashboard.mutateAsync({
+      name: t('dashboards.defaultName'),
+      datasetId,
+    });
     select(created.id);
   };
 
@@ -62,61 +69,23 @@ function DashboardsRoute() {
 
   return (
     <div className="flex h-full min-h-0">
-      <aside className="bg-base-100 border-base-300 hidden w-56 shrink-0 flex-col border-r md:flex print:hidden">
-        <div className="flex gap-1 p-3">
-          <input
-            className="input input-bordered input-sm w-full"
-            placeholder={t('dashboards.namePlaceholder')}
-            value={name}
-            onChange={(event) => setName(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter') void create();
-            }}
-          />
-          <button
-            type="button"
-            className="btn btn-primary btn-square btn-sm"
-            title={t('dashboards.create')}
-            aria-label={t('dashboards.create')}
-            disabled={!name.trim() || createDashboard.isPending}
-            onClick={() => void create()}
-          >
-            <IconPlus size={16} stroke={1.75} />
-          </button>
-        </div>
-
-        <ul className="menu menu-sm min-h-0 flex-1 overflow-y-auto">
-          {dashboards.data?.length === 0 && (
-            <li className="text-base-content/50 px-3 py-2 text-xs">
-              {t('dashboards.noDashboards')}
-            </li>
-          )}
-          {dashboards.data?.map((entry) => (
-            <li key={entry.id}>
-              <button
-                type="button"
-                className={entry.id === activeId ? 'menu-active' : ''}
-                onClick={() => select(entry.id)}
-              >
-                <span className="flex-1 truncate text-left">{entry.name}</span>
-                <span className="badge badge-ghost badge-xs">{entry.widgetCount}</span>
-                <button
-                  type="button"
-                  className="btn btn-ghost btn-square btn-xs"
-                  title={t('dashboards.remove')}
-                  aria-label={t('dashboards.remove')}
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    setPendingDelete({ id: entry.id, name: entry.name });
-                  }}
-                >
-                  <IconTrash size={14} stroke={1.75} />
-                </button>
-              </button>
-            </li>
-          ))}
-        </ul>
-      </aside>
+      <Sidebar
+        items={(dashboards.data ?? []).map((entry) => ({
+          id: entry.id,
+          title: entry.name,
+          meta: t('common.createdOn', { day: formatDay(entry.createdAt, locale) }),
+        }))}
+        activeId={activeId}
+        newLabel={t('dashboards.create')}
+        emptyLabel={t('dashboards.noDashboards')}
+        busy={createDashboard.isPending}
+        onNew={() => void create()}
+        onSelect={select}
+        onRename={(id, name) => renameDashboard.mutate({ id, name })}
+        onRegenerate={(id) => regenerateName.mutate({ id, locale })}
+        pendingId={regenerateName.isPending ? regenerateName.variables?.id : undefined}
+        onDelete={(item) => setPendingDelete({ id: item.id, name: item.title })}
+      />
 
       <section className="min-w-0 flex-1">
         {dashboard.data ? (

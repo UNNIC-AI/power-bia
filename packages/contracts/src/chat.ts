@@ -66,6 +66,12 @@ export const conversationWithMessagesSchema = conversationSchema.extend({
   messages: z.array(messageSchema),
 });
 
+/** Titles are generated from the thread; renaming overrides that. */
+export const renameConversationSchema = z.object({ title: z.string().min(1).max(120) });
+
+/** Ask for a fresh generated title. The locale decides what language it is in. */
+export const regenerateTitleSchema = z.object({ locale: localeSchema.default('es') });
+
 export type FilterSelection = z.infer<typeof filterSelectionSchema>;
 export type ChatRequest = z.infer<typeof chatRequestSchema>;
 export type QueryRequest = z.infer<typeof queryRequestSchema>;
@@ -73,4 +79,6 @@ export type QueryResponse = z.infer<typeof queryResponseSchema>;
 export type CardPart = z.infer<typeof cardPartSchema>;
 export type Message = z.infer<typeof messageSchema>;
 export type Conversation = z.infer<typeof conversationSchema>;
+export type RenameConversation = z.infer<typeof renameConversationSchema>;
+export type RegenerateTitle = z.infer<typeof regenerateTitleSchema>;
 export type ConversationWithMessages = z.infer<typeof conversationWithMessagesSchema>;

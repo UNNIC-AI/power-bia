@@ -3,6 +3,7 @@ import { IconChevronLeft, IconChevronRight } from '@tabler/icons-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { formatCell } from '../../lib/format.ts';
+import { Tooltip } from '../Tooltip.tsx';
 
 const PAGE_SIZE = 25;
 
@@ -53,26 +54,28 @@ export function TableCard({ card, locale }: { card: TableCardType; locale: Local
             {t('table.page', { page: current + 1, pages })}
           </span>
           <div className="join">
-            <button
-              type="button"
-              className="btn join-item btn-square btn-xs"
-              title={t('table.previous')}
-              aria-label={t('table.previous')}
-              disabled={current === 0}
-              onClick={() => setPage(current - 1)}
-            >
-              <IconChevronLeft size={14} stroke={1.75} />
-            </button>
-            <button
-              type="button"
-              className="btn join-item btn-square btn-xs"
-              title={t('table.next')}
-              aria-label={t('table.next')}
-              disabled={current >= pages - 1}
-              onClick={() => setPage(current + 1)}
-            >
-              <IconChevronRight size={14} stroke={1.75} />
-            </button>
+            <Tooltip label={t('table.previous')}>
+              <button
+                type="button"
+                className="btn join-item btn-square btn-xs"
+                aria-label={t('table.previous')}
+                disabled={current === 0}
+                onClick={() => setPage(current - 1)}
+              >
+                <IconChevronLeft size={14} stroke={1.75} />
+              </button>
+            </Tooltip>
+            <Tooltip label={t('table.next')}>
+              <button
+                type="button"
+                className="btn join-item btn-square btn-xs"
+                aria-label={t('table.next')}
+                disabled={current >= pages - 1}
+                onClick={() => setPage(current + 1)}
+              >
+                <IconChevronRight size={14} stroke={1.75} />
+              </button>
+            </Tooltip>
           </div>
         </div>
       )}

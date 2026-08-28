@@ -4,6 +4,8 @@ import {
   dashboardSchema,
   dashboardSummarySchema,
   errorSchema,
+  regenerateTitleSchema,
+  renameDashboardSchema,
   updateLayoutsSchema,
   updateWidgetSchema,
   type Widget,
@@ -14,6 +16,7 @@ import type { FastifyInstance } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { requireUser } from '../app.js';
+import { retitleDashboard } from '../pipeline/retitle.js';
 
 const dashboardParams = z.object({ id: z.uuid() });
 const widgetParams = z.object({ id: z.uuid(), widgetId: z.uuid() });
@@ -52,10 +55,11 @@ export async function dashboardRoutes(app: FastifyInstance) {
         orderBy: asc(schema.dashboards.createdAt),
       });
 
-      return dashboards.map(({ id, name, datasetId, widgets }) => ({
+      return dashboards.map(({ id, name, datasetId, createdAt, widgets }) => ({
         id,
         name,
         datasetId,
+        createdAt: createdAt.toISOString(),
         widgetCount: widgets.length,
       }));
     },
@@ -91,6 +95,87 @@ export async function dashboardRoutes(app: FastifyInstance) {
 
     return { ...dashboard, widgets: [] };
   });
+
+  route.patch(
+    '/:id',
+    {
+      schema: {
+        params: dashboardParams,
+        body: renameDashboardSchema,
+        response: { 200: dashboardSummarySchema, 404: errorSchema },
+      },
+    },
+    async (request, reply) => {
+      const user = requireUser(request);
+
+      const [updated] = await app.db
+        .update(schema.dashboards)
+        .set({ name: request.body.name })
+        .where(
+          and(eq(schema.dashboards.id, request.params.id), eq(schema.dashboards.userId, user.id)),
+        )
+        .returning();
+      if (!updated) return reply.code(404).send({ message: 'Dashboard not found' });
+
+      const widgetCount = await app.db.$count(
+        schema.widgets,
+        eq(schema.widgets.dashboardId, updated.id),
+      );
+
+      return {
+        id: updated.id,
+        name: updated.name,
+        datasetId: updated.datasetId,
+        createdAt: updated.createdAt.toISOString(),
+        widgetCount,
+      };
+    },
+  );
+
+  route.post(
+    '/:id/name',
+    {
+      schema: {
+        params: dashboardParams,
+        body: regenerateTitleSchema,
+        response: { 200: dashboardSummarySchema, 404: errorSchema, 502: errorSchema },
+      },
+    },
+    async (request, reply) => {
+      const user = requireUser(request);
+
+      const dashboard = await ownedDashboard(user.id, request.params.id);
+      if (!dashboard) return reply.code(404).send({ message: 'Dashboard not found' });
+
+      try {
+        // A view with no widgets has nothing to summarise: `retitleDashboard`
+        // returns null and the placeholder name stands.
+        const name = await retitleDashboard({
+          db: app.db,
+          dashboardId: dashboard.id,
+          datasetId: dashboard.datasetId,
+          locale: request.body.locale,
+        });
+
+        const widgetCount = await app.db.$count(
+          schema.widgets,
+          eq(schema.widgets.dashboardId, dashboard.id),
+        );
+
+        return {
+          id: dashboard.id,
+          name: name ?? dashboard.name,
+          datasetId: dashboard.datasetId,
+          createdAt: dashboard.createdAt.toISOString(),
+          widgetCount,
+        };
+      } catch (error) {
+        app.log.warn({ err: error, dashboardId: dashboard.id }, 'retitle failed');
+
+        return reply.code(502).send({ message: 'Could not generate a name' });
+      }
+    },
+  );
 
   route.delete('/:id', { schema: { params: dashboardParams } }, async (request) => {
     const user = requireUser(request);

@@ -8,6 +8,7 @@ import { useTranslation } from 'react-i18next';
 import { keys } from '../../lib/queries.ts';
 import { CardPanel } from '../cards/CardView.tsx';
 import { Prompt } from '../Prompt.tsx';
+import { Tooltip } from '../Tooltip.tsx';
 import { DaxViewer } from './DaxViewer.tsx';
 
 export type ChatUIMessage = UIMessage<
@@ -199,18 +200,19 @@ export function ChatPanel({
                     onChoice={(_id, label) => send(label)}
                     actions={
                       onPin && payload.card.kind !== 'choice' ? (
-                        <button
-                          type="button"
-                          className="btn btn-ghost btn-square btn-xs"
-                          title={t('chat.pinToDashboard')}
-                          aria-label={t('chat.pinToDashboard')}
-                          onClick={() => {
-                            if (payload.card)
-                              onPin(payload.card, questionFor.get(message.id) ?? '', payload.dax);
-                          }}
-                        >
-                          <IconPin size={16} stroke={1.75} />
-                        </button>
+                        <Tooltip label={t('chat.pinToDashboard')}>
+                          <button
+                            type="button"
+                            className="btn btn-ghost btn-square btn-xs"
+                            aria-label={t('chat.pinToDashboard')}
+                            onClick={() => {
+                              if (payload.card)
+                                onPin(payload.card, questionFor.get(message.id) ?? '', payload.dax);
+                            }}
+                          >
+                            <IconPin size={16} stroke={1.75} />
+                          </button>
+                        </Tooltip>
                       ) : undefined
                     }
                   />
@@ -238,9 +240,7 @@ export function ChatPanel({
         <div ref={bottom} />
       </div>
 
-      <div className="border-base-300 shrink-0 border-t p-4">
-        <Prompt onSubmit={send} busy={busy} label={t('chat.send')} />
-      </div>
+      <Prompt onSubmit={send} busy={busy} label={t('chat.send')} />
     </div>
   );
 }

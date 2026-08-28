@@ -8,7 +8,12 @@ export const resources = {
   es: {
     translation: {
       appName: 'Power BIA',
-      nav: { chat: 'Chat', dashboards: 'Vistas' },
+      nav: {
+        chat: 'Chat',
+        dashboards: 'Vistas',
+        showSidebar: 'Mostrar el panel',
+        hideSidebar: 'Ocultar el panel',
+      },
       prompt: { placeholder: 'Pregunta sobre tus datos…' },
       auth: {
         signIn: 'Iniciar sesión',
@@ -22,7 +27,7 @@ export const resources = {
         passwordHint: 'Mínimo 12 caracteres',
       },
       chat: {
-        newQuery: 'Nueva consulta',
+        newQuery: 'Nuevo chat',
         emptyTitle: 'Consulta en lenguaje natural',
         emptyBody:
           'Pregunta lo que quieras sobre el modelo. Obtendrás datos reales y visualizaciones automáticas.',
@@ -31,7 +36,6 @@ export const resources = {
         showDax: 'Ver DAX',
         hideDax: 'Ocultar DAX',
         pinToDashboard: 'Fijar a una vista',
-        delete: 'Eliminar',
         send: 'Enviar',
         confirmDeleteTitle: '¿Eliminar esta consulta?',
         confirmDeleteBody:
@@ -44,8 +48,8 @@ export const resources = {
       },
       dashboards: {
         title: 'Vistas',
-        create: 'Crear vista',
-        namePlaceholder: 'Nombre de la vista…',
+        create: 'Nueva vista',
+        defaultName: 'Vista sin título',
         empty: 'Esta vista está vacía. Fija un gráfico desde el chat o pregunta aquí abajo.',
         noDashboards: 'Aún no tienes vistas.',
         add: 'Añadir gráfico',
@@ -65,6 +69,9 @@ export const resources = {
         export: 'Exportar PDF',
         selectedOf: '{{selected}} de {{total}} seleccionados',
         valueCount: '{{count}} valores',
+        confirmRemoveTitle: '¿Quitar este gráfico?',
+        confirmRemoveBody:
+          'Se quitará «{{title}}» de la vista. La conversación que lo generó no se toca.',
         confirmDeleteTitle: '¿Eliminar esta vista?',
         confirmDeleteBody:
           'Se eliminará «{{name}}» y todos sus gráficos. Esta acción no se puede deshacer.',
@@ -83,13 +90,23 @@ export const resources = {
         darkMode: 'Modo oscuro',
         cancel: 'Cancelar',
         delete: 'Eliminar',
+        rename: 'Renombrar',
+        actions: 'Acciones',
+        regenerateTitle: 'Regenerar título',
+        updatedOn: 'Actualizado el {{day}}',
+        createdOn: 'Creado el {{day}}',
       },
     },
   },
   en: {
     translation: {
       appName: 'Power BIA',
-      nav: { chat: 'Chat', dashboards: 'Views' },
+      nav: {
+        chat: 'Chat',
+        dashboards: 'Views',
+        showSidebar: 'Show the sidebar',
+        hideSidebar: 'Hide the sidebar',
+      },
       prompt: { placeholder: 'Ask about your data…' },
       auth: {
         signIn: 'Sign in',
@@ -103,7 +120,7 @@ export const resources = {
         passwordHint: 'At least 12 characters',
       },
       chat: {
-        newQuery: 'New query',
+        newQuery: 'New chat',
         emptyTitle: 'Natural language queries',
         emptyBody:
           'Ask anything about the model. You will get real data and automatic visualizations.',
@@ -112,7 +129,6 @@ export const resources = {
         showDax: 'Show DAX',
         hideDax: 'Hide DAX',
         pinToDashboard: 'Pin to a view',
-        delete: 'Delete',
         send: 'Send',
         confirmDeleteTitle: 'Delete this query?',
         confirmDeleteBody:
@@ -125,8 +141,8 @@ export const resources = {
       },
       dashboards: {
         title: 'Views',
-        create: 'Create view',
-        namePlaceholder: 'View name…',
+        create: 'New view',
+        defaultName: 'Untitled view',
         empty: 'This view is empty. Pin a chart from chat, or ask a question below.',
         noDashboards: "You don't have any views yet.",
         add: 'Add chart',
@@ -146,6 +162,9 @@ export const resources = {
         export: 'Export PDF',
         selectedOf: '{{selected}} of {{total}} selected',
         valueCount: '{{count}} values',
+        confirmRemoveTitle: 'Remove this chart?',
+        confirmRemoveBody:
+          '“{{title}}” will be taken off the view. The chat that produced it is untouched.',
         confirmDeleteTitle: 'Delete this view?',
         confirmDeleteBody:
           '“{{name}}” and all of its charts will be deleted. This cannot be undone.',
@@ -164,6 +183,11 @@ export const resources = {
         darkMode: 'Dark mode',
         cancel: 'Cancel',
         delete: 'Delete',
+        rename: 'Rename',
+        actions: 'Actions',
+        regenerateTitle: 'Regenerate title',
+        updatedOn: 'Updated {{day}}',
+        createdOn: 'Created {{day}}',
       },
     },
   },

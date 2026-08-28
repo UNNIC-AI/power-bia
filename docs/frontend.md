@@ -1,6 +1,7 @@
 # Frontend
 
-React 19 + Vite 8 + Tailwind 4 + DaisyUI 5 + TanStack Router/Query + Recharts 3.
+React 19 + Vite 8 + Tailwind 4 + DaisyUI 5 + Radix primitives + TanStack Router/Query +
+Recharts 3.
 
 ## Routes
 
@@ -11,10 +12,10 @@ edit it.
 ```
 __root.tsx              Outlet + 404
 login.tsx               Sign in / register (one form, toggled)
-_authed.tsx             Auth guard + app shell (nav, dataset strip, theme, locale, logout)
+_authed.tsx             Auth guard + app shell (sidebar toggle, dataset strip, theme, locale, logout)
 _authed/index.tsx       redirect → /chat
-_authed/chat.tsx        Conversation sidebar + ChatPanel
-_authed/dashboards.tsx  View sidebar + DashboardCanvas
+_authed/chat.tsx        Sidebar of chats + ChatPanel
+_authed/dashboards.tsx  Sidebar of views + DashboardCanvas
 ```
 
 Selection lives in **typed search params** rather than path params: `/chat?c=<id>`
@@ -23,9 +24,9 @@ and `/dashboards?d=<id>`. Fewer route files, still deep-linkable. Note that
 `navigate` must pass the key explicitly — `search={{ c: undefined }}`, not
 `search={{}}`, which is a type error.
 
-The two tabs read **Chat** and **Views**. The route paths and the `dashboards`
-i18n namespace keep the older name — renaming them buys nothing and breaks every
-existing link.
+The two tabs — at the top of the sidebar, not in the navbar — read **Chat** and
+**Views**. The route paths and the `dashboards` i18n namespace keep the older
+name: renaming them buys nothing and breaks every existing link.
 
 `ChatPanel` is remounted to switch conversations, which replays that
 conversation's history as the initial messages — `useChat` reads `messages` only
@@ -48,29 +49,84 @@ with a `keys` object so invalidation is not stringly-typed. `lib/api.ts` is a th
 typed fetch wrapper that throws `ApiError` with the server's message.
 
 No global client state library. Theme is a small context (`lib/theme-context.tsx`),
-locale is i18next, everything else is server state or local component state.
+whether the sidebar is open is another (`lib/sidebar-context.tsx`), locale is
+i18next, everything else is server state or local component state.
+
+The sidebar needs a context because the toggle lives in the navbar and the panel
+it opens lives inside each route, so the state has to sit above both. Open is the
+default and the choice is remembered in `localStorage`, like the theme.
+
+## Behaviour primitives: Radix
+
+Interactive behaviour comes from the unified [`radix-ui`](https://www.radix-ui.com)
+package; the look stays DaisyUI's, applied to the primitives' parts.
+
+| Wrapper | Primitive | Replaces |
+|---|---|---|
+| `components/Menu.tsx` | `DropdownMenu` | DaisyUI's CSS-only dropdown, which opened on `:focus-within` — no roving focus, no Esc, no way to close it from a handler |
+| `components/Tooltip.tsx` | `Tooltip` | `title` attributes on icon-only buttons: a delay the user cannot see coming, unstyled, and nothing at all on touch |
+| `components/ConfirmDialog.tsx` | `AlertDialog` | a native `<dialog>` driven imperatively with `showModal()` |
+| `components/chat/DaxViewer.tsx` | `Collapsible` | a bare `useState` toggle with no `aria-expanded` |
+
+Two deliberate non-adoptions: the slicer's checkboxes stay native inputs inside
+`<label>`, which is already accessible and keeps DaisyUI's `checkbox` styling; and
+the sidebar's screen switch stays TanStack `Link`s rather than Radix `Tabs`, because
+the router owns which one is active.
+
+Radix tooltips are decoration, not names — every icon button keeps its own
+`aria-label`. `Tooltip.Provider` is mounted once in `main.tsx` so moving between
+two icon buttons shows the second tooltip immediately.
+
+Styling gotcha worth remembering: DaisyUI's `modal-box` is transparent and scaled
+down until an enclosing `.modal` opens it, so putting that class on Radix content
+renders a dialog that is present in the accessibility tree and invisible on
+screen. Dialog surfaces are built from tokens instead.
 
 ## The question box
 
 Both screens ask questions through the same component, `components/Prompt.tsx`:
-a one-row textarea capped at `max-h-40`, Enter to submit and Shift+Enter for a
-newline, with the button showing a spinner while a request is in flight. It owns
-the draft text and clears it on submit, so neither caller keeps input state.
+Enter submits, Shift+Enter inserts a newline, and the field grows with the text up
+to six rows before it scrolls. The height is measured from the element's own
+`scrollHeight` in a layout effect, so wrapped lines count like typed ones and the
+new height paints in the same frame as the character that caused it. `items-end`
+on the row keeps the button on the last line as the field grows.
 
-Only the button differs: chat sends a message, a view adds a widget, so the icon
-and its label are props. The placeholder is not — it reads `prompt.placeholder`
-itself, which is what keeps the two screens identical.
+The component also owns the footer band it sits in — border, padding and all.
+When each screen supplied its own, chat's `p-4` and the view's `p-3` made the box
+jump a few pixels as you switched tabs. Only the button differs: chat sends a
+message, a view adds a widget, so the icon and its label are props. The
+placeholder is not — it reads `prompt.placeholder` itself.
+
+## The sidebar
+
+`components/Sidebar.tsx` is one list for both screens: a chat row and a view row
+differ only in what selecting them means. It renders the screen switch, the New
+button, and the rows; each row carries a three-dot menu with **Rename**,
+**Regenerate title** and **Delete**, and the row's timestamp as the menu's header
+rather than as a column — a date on every row is noise, but it is exactly what you
+want when you have opened the menu to decide something about that row.
+
+Renaming happens in place: the menu item swaps the row for an input, Enter or blur
+commits, Esc cancels. The row itself is a flex line with the label button and the
+menu trigger as siblings; it used to be a button nested inside a button, which is
+invalid HTML, and the browser resolved clicks to the outer one — so the old trash
+icon selected the row it was meant to delete.
+
+Creating a view no longer asks for a name up front: it is created as "Untitled
+view" and named afterwards, by hand or from the model. That is what let the two
+lists become one component.
 
 ## Destructive actions
 
-Deleting a chat or a view goes through `components/ConfirmDialog.tsx` — a native
-`<dialog>` driven with `showModal()`, which brings the focus trap, Esc handling,
-the inert background and top-layer stacking with it. Setting the `open` attribute
-declaratively renders the element but gives all of that up, so the route holds a
-`pendingDelete` object and the dialog opens and closes imperatively from an effect.
+Deleting a chat or a view goes through `components/ConfirmDialog.tsx`, a Radix
+`AlertDialog`: the focus trap, Esc handling and inert background that the native
+`<dialog>` gave us, but driven by the `open` prop rather than by an effect calling
+`showModal()`. It also defaults focus to Cancel and wires the title and body as
+the accessible name and description, which is the right shape for a destructive
+question. The route still owns the `pendingDelete` row.
 
-The dialog names the row it is about to remove, because the sidebars truncate long
-titles and the trash icons sit one row apart.
+The dialog names the row it is about to remove, because the sidebar truncates long
+titles and the menu that opened it has already closed.
 
 Removing a **widget** from a view is deliberately not guarded: it is a single card
 that can be pinned again from chat, not a thread or a whole dashboard.
@@ -148,6 +204,19 @@ The toggle stamps `data-theme` on `<html>`; the initial value comes from
 localStorage falling back to `prefers-color-scheme`. Charts read the theme through
 `useTheme()` to pick their palette column, because Recharts needs concrete colour
 values rather than CSS variables for series fills.
+
+### Corners
+
+DaisyUI splits radius into `--radius-selector` (checkbox, toggle, badge),
+`--radius-field` (input, button, tab) and `--radius-box` (card, modal, menu).
+`styles.css` points all three at a single `--radius-app`, so one value decides
+every corner in the app and the three scales can never drift apart.
+
+Components therefore do **not** set their own `rounded-*`. The two allowed shapes
+are the tokens — `rounded-box` / `rounded-field` on hand-built surfaces that are
+not DaisyUI components, such as the tooltip and the menu — and `rounded-full`
+where a pill is intended, like the sidebar's screen switch and the send button.
+A one-off `rounded-2xl` on the prompt was exactly the drift this rule prevents.
 
 ## Icons
 
