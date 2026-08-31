@@ -17,6 +17,7 @@ import { env } from '../env.js';
 import {
   buildInstructions,
   CONVERSATION_ROLE,
+  describeProjection,
   describeRequiredShape,
   FILTER_IDENTIFIER_ROLE,
   GENERATOR_ROLE,
@@ -239,10 +240,11 @@ export function answerData(options: {
   text: string;
   result: { columns: string[]; rows: unknown[][] } | null;
   error: string | null;
+  decision: VizDecision | null;
   dataset: DatasetContext;
   locale: Locale;
 }) {
-  const { text, result, error, dataset, locale } = options;
+  const { text, result, error, decision, dataset, locale } = options;
 
   return streamText({
     model,
@@ -257,7 +259,7 @@ export function answerData(options: {
 ${text}
 
 Resultado de la consulta:
-${describeResult(result, error)}`,
+${describeResult(result, error)}${describeProjection(decision)}`,
   });
 }
 

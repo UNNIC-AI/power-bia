@@ -9,6 +9,7 @@ export const resources = {
     translation: {
       appName: 'Power BIA',
       nav: {
+        dataset: 'Modelo de datos',
         chat: 'Chat',
         dashboards: 'Vistas',
         showSidebar: 'Mostrar el panel',
@@ -82,6 +83,42 @@ export const resources = {
         previous: 'Página anterior',
         next: 'Página siguiente',
       },
+      settings: {
+        title: 'Ajustes del modelo',
+        counts: '{{tables}} tablas · {{measures}} medidas',
+        lastSync: 'Última sincronización: {{day}} a las {{time}}',
+        neverSynced: 'Nunca sincronizado con Power BI',
+        extraContext: 'Contexto adicional',
+        extraContextHelp:
+          'Se añade al prompt del asistente. Úsalo para explicar nombres de tabla poco claros, vocabulario de negocio o avisos sobre columnas concretas.',
+        extraContextPlaceholder:
+          'Ej.: TBL_VTA_CAB es la cabecera de ventas. «Facturación» = precio de venta × unidades.',
+        dateRange: 'Rango de fechas',
+        dateRangeHelp:
+          'Se detecta al sincronizar. Corrígelo aquí si el modelo no tiene tabla de calendario.',
+        dateMin: 'Fecha mínima',
+        dateMax: 'Fecha máxima',
+        sync: 'Sincronizar modelo',
+        syncDone: 'Sincronizado en {{seconds}} s',
+        syncCounts:
+          '{{tables}} tablas · {{columns}} columnas · {{measures}} medidas · {{removed}} eliminadas',
+        noDataset: 'No hay ningún modelo de datos conectado todavía.',
+        connectFirst: 'Conectar un modelo',
+        connectTitle: 'Conectar otro modelo',
+        connectFirstHelp:
+          'Necesitas un principal de servicio de Azure con acceso de lectura al workspace de Power BI.',
+        connectHelp:
+          'Al conectar, el modelo se introspecciona automáticamente: tablas, columnas, relaciones y rango de fechas.',
+        modelName: 'Nombre para mostrar',
+        workspaceName: 'Workspace de Power BI',
+        datasetName: 'Nombre del dataset',
+        tenantId: 'Tenant ID',
+        clientId: 'Client ID',
+        clientSecret: 'Client secret',
+        connect: 'Conectar e introspeccionar',
+        connecting: 'Conectando e introspeccionando…',
+        save: 'Guardar',
+      },
       common: {
         retry: 'Reintentar',
         loading: 'Cargando…',
@@ -102,6 +139,7 @@ export const resources = {
     translation: {
       appName: 'Power BIA',
       nav: {
+        dataset: 'Data model',
         chat: 'Chat',
         dashboards: 'Views',
         showSidebar: 'Show the sidebar',
@@ -174,6 +212,41 @@ export const resources = {
         noRows: 'No results',
         previous: 'Previous page',
         next: 'Next page',
+      },
+      settings: {
+        title: 'Model settings',
+        counts: '{{tables}} tables · {{measures}} measures',
+        lastSync: 'Last sync: {{day}} at {{time}}',
+        neverSynced: 'Never synced with Power BI',
+        extraContext: 'Additional context',
+        extraContextHelp:
+          "Added to the assistant's prompt. Use it to explain unclear table names, business vocabulary, or caveats about specific columns.",
+        extraContextPlaceholder:
+          'E.g. TBL_VTA_CAB is the sales header. "Revenue" = retail price × units.',
+        dateRange: 'Date range',
+        dateRangeHelp: 'Detected on sync. Correct it here when the model has no calendar table.',
+        dateMin: 'Earliest date',
+        dateMax: 'Latest date',
+        sync: 'Sync model',
+        syncDone: 'Synced in {{seconds}}s',
+        syncCounts:
+          '{{tables}} tables · {{columns}} columns · {{measures}} measures · {{removed}} removed',
+        noDataset: 'No data model connected yet.',
+        connectFirst: 'Connect a model',
+        connectTitle: 'Connect another model',
+        connectFirstHelp:
+          'You need an Azure service principal with read access to the Power BI workspace.',
+        connectHelp:
+          'On connecting, the model is introspected automatically: tables, columns, relationships and date range.',
+        modelName: 'Display name',
+        workspaceName: 'Power BI workspace',
+        datasetName: 'Dataset name',
+        tenantId: 'Tenant ID',
+        clientId: 'Client ID',
+        clientSecret: 'Client secret',
+        connect: 'Connect and introspect',
+        connecting: 'Connecting and introspecting…',
+        save: 'Save',
       },
       common: {
         retry: 'Retry',

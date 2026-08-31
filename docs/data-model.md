@@ -16,10 +16,10 @@ Drizzle schema in `packages/db/src/schema.ts`; generated SQL in
 
 | Table | Notes |
 |---|---|
-| `datasets` | One Power BI connection. Structured `tenant_id` / `client_id` / `workspace_name` / `dataset_name`, plus `client_secret_encrypted`. `date_min` / `date_max` drive the pipeline's temporal awareness |
+| `datasets` | One Power BI connection. Structured `tenant_id` / `client_id` / `workspace_name` / `dataset_name`, plus `client_secret_encrypted`. `date_min` / `date_max` drive the pipeline's temporal awareness. **`extra_context`** is admin-written prose injected into every prompt |
 | `dataset_tables` | name, role (`fact` / `dimension` / `date`), description |
 | `dataset_columns` | name, type, sample value, `is_aggregatable`, **`note`**, **`labels`** |
-| `dataset_measures` | business vocabulary → DAX expression |
+| `dataset_measures` | business vocabulary → DAX expression, plus `source` (`curated` / `introspected`) |
 | `dataset_relationships` | from/to column, cardinality, active |
 | `dataset_synonyms` | user term → canonical target |
 
@@ -30,10 +30,26 @@ integer. It cannot rediscover "this is the only summable column in the model" or
 "never `ORDER BY` this in a monthly grouping" — and those notes are what make the
 generated DAX correct.
 
-**Any future introspection must upsert on `(table_id, name)` and preserve `note`
-and `labels`.** Wiping them silently degrades DAX quality with no error anywhere.
+**Introspection must upsert on `(table_id, name)` and preserve `note` and
+`labels`.** Wiping them silently degrades DAX quality with no error anywhere.
 There are unique indexes on `(dataset_id, name)` and `(table_id, name)` to make
-that upsert natural.
+that upsert natural, and `introspect.test.ts` asserts the invariant against the
+development database.
+
+`apps/api/src/datasets/introspect.ts` reconciles per table, and the policy differs
+by table because the curated surface does:
+
+| Table | Policy |
+|---|---|
+| `dataset_tables` | Upsert on `(dataset_id, name)`; stale rows deleted. `role` is always overwritten (it is derived); an empty introspected `description` never overwrites a curated one |
+| `dataset_columns` | Upsert on `(table_id, name)`; only `data_type`, `is_aggregatable` and `sample_value` are written. `note` and `labels` are absent from the `set` on purpose |
+| `dataset_measures` | Only `source = 'introspected'` rows are written or deleted. A `curated` row wins over a model measure of the same name |
+| `dataset_relationships` | Replaced wholesale — nothing curated lives here, and there is no unique index to key an upsert on |
+| `dataset_synonyms` | Never touched. 100% curated |
+
+`extra_context` is the escape hatch for everything the heuristics cannot infer.
+Unlike `note`, it is per dataset rather than per column, and it reaches **every**
+prompt stage — including the router and the titler, which see no schema at all.
 
 `labels` is a partial per-locale record (`{ es?, en? }`), replacing the MVP's
 hardcoded `_COL_ES` dictionary of Iowa-specific column names. It feeds

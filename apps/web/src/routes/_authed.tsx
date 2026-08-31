@@ -1,32 +1,36 @@
 import type { Locale } from '@powerbia/contracts';
 import {
+  IconDatabase,
   IconLanguage,
   IconLayoutSidebarLeftCollapse,
   IconLayoutSidebarLeftExpand,
   IconLogout,
   IconMoon,
+  IconSettings,
   IconSun,
 } from '@tabler/icons-react';
 import { createFileRoute, Outlet, useNavigate } from '@tanstack/react-router';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Menu, MenuItem, MenuSeparator } from '../components/Menu.tsx';
+import { SettingsDialog } from '../components/SettingsDialog.tsx';
 import { Tooltip } from '../components/Tooltip.tsx';
+import { DatasetProvider, useDataset } from '../lib/dataset-context.tsx';
 import { setLocale } from '../lib/i18n.ts';
-import { useDatasets, useLogout, useMe } from '../lib/queries.ts';
+import { useLogout, useMe } from '../lib/queries.ts';
 import { useSidebar } from '../lib/sidebar-context.tsx';
 import { useTheme } from '../lib/theme-context.tsx';
 
 export const Route = createFileRoute('/_authed')({ component: AuthedLayout });
 
+/**
+ * The provider wraps the shell rather than sitting in `main.tsx` so that
+ * `/datasets` is only requested once there is a session — at the root it would
+ * fire a 401 on the login page.
+ */
 function AuthedLayout() {
-  const { t } = useTranslation();
   const navigate = useNavigate();
   const me = useMe();
-  const logout = useLogout();
-  const datasets = useDatasets();
-  const locale = useActiveLocale();
-  const { theme, toggle } = useTheme();
-  const sidebar = useSidebar();
 
   if (me.isLoading) {
     return (
@@ -41,7 +45,26 @@ function AuthedLayout() {
     return null;
   }
 
-  const dataset = datasets.data?.[0];
+  return (
+    <DatasetProvider>
+      <AuthedShell />
+    </DatasetProvider>
+  );
+}
+
+function AuthedShell() {
+  const { t } = useTranslation();
+  const navigate = useNavigate();
+  const me = useMe();
+  const logout = useLogout();
+  const locale = useActiveLocale();
+  const { theme, toggle } = useTheme();
+  const sidebar = useSidebar();
+  const { datasets, active, select } = useDataset();
+  const [settingsOpen, setSettingsOpen] = useState(false);
+
+  if (!me.data) return null;
+  const isAdmin = me.data.role === 'admin';
 
   return (
     <div className="bg-base-200 flex h-screen flex-col">
@@ -66,10 +89,30 @@ function AuthedLayout() {
 
         <div className="flex-1" />
 
-        {dataset && (
+        {/* A picker only earns its place once there is something to pick. */}
+        {datasets.length > 1 && (
+          <label className="flex items-center gap-1">
+            <IconDatabase size={14} stroke={1.75} className="text-base-content/50" />
+            <span className="sr-only">{t('nav.dataset')}</span>
+            <select
+              className="select select-ghost select-xs w-40"
+              value={active?.id ?? ''}
+              onChange={(event) => select(event.target.value)}
+            >
+              {datasets.map((dataset) => (
+                <option key={dataset.id} value={dataset.id}>
+                  {dataset.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+
+        {active && (
           <span className="text-base-content/60 hidden text-xs lg:inline">
-            {dataset.name} · {dataset.dateRange.min} → {dataset.dateRange.max} ·{' '}
-            {dataset.tableCount} · {dataset.measureCount}
+            {datasets.length > 1 ? '' : `${active.name} · `}
+            {active.dateRange.min} → {active.dateRange.max} · {active.tableCount} ·{' '}
+            {active.measureCount}
           </span>
         )}
 
@@ -96,6 +139,14 @@ function AuthedLayout() {
             {locale === 'es' ? 'English' : 'Español'}
           </MenuItem>
 
+          {/* Introspection hits the customer's capacity, so it is admin-only. */}
+          {isAdmin && (
+            <MenuItem onSelect={() => setSettingsOpen(true)}>
+              <IconSettings size={14} stroke={1.75} />
+              {t('settings.title')}
+            </MenuItem>
+          )}
+
           <MenuSeparator />
 
           <MenuItem
@@ -108,16 +159,35 @@ function AuthedLayout() {
       </header>
 
       <main className="min-h-0 flex-1">
-        {dataset ? (
+        {active ? (
           <Outlet />
         ) : (
-          <div className="flex h-full items-center justify-center p-8 text-center">
-            <p className="text-base-content/60 text-sm">
-              No hay ningún modelo de datos configurado todavía.
-            </p>
+          <div className="flex h-full flex-col items-center justify-center gap-3 p-8 text-center">
+            <p className="text-base-content/60 text-sm">{t('settings.noDataset')}</p>
+            {isAdmin && (
+              <button
+                type="button"
+                className="btn btn-primary btn-sm"
+                onClick={() => setSettingsOpen(true)}
+              >
+                <IconSettings size={14} stroke={1.75} />
+                {t('settings.connectFirst')}
+              </button>
+            )}
           </div>
         )}
       </main>
+
+      {/*
+        Outside the `active` guard above: the settings dialog is how the first
+        model gets connected, so it has to be reachable when there is none.
+      */}
+      <SettingsDialog
+        open={settingsOpen}
+        dataset={active}
+        locale={locale}
+        onClose={() => setSettingsOpen(false)}
+      />
     </div>
   );
 }

@@ -6,13 +6,13 @@ import { useTranslation } from 'react-i18next';
 import { ConfirmDialog } from '../../components/ConfirmDialog.tsx';
 import { ChatPanel } from '../../components/chat/ChatPanel.tsx';
 import { Sidebar } from '../../components/Sidebar.tsx';
+import { useDataset } from '../../lib/dataset-context.tsx';
 import { formatDay } from '../../lib/format.ts';
 import {
   useAddWidget,
   useConversation,
   useConversations,
   useDashboards,
-  useDatasets,
   useDeleteConversation,
   useRegenerateConversationTitle,
   useRenameConversation,
@@ -41,7 +41,7 @@ function ChatRoute() {
   const navigate = useNavigate();
   const { c: conversationId } = Route.useSearch();
 
-  const datasets = useDatasets();
+  const { active } = useDataset();
   const conversations = useConversations();
   const conversation = useConversation(conversationId ?? null);
   const renameConversation = useRenameConversation();
@@ -92,7 +92,7 @@ function ChatRoute() {
   /** Deleting is irreversible, so the row is held here until it is confirmed. */
   const [pendingDelete, setPendingDelete] = useState<{ id: string; title: string } | null>(null);
 
-  const datasetId = datasets.data?.[0]?.id;
+  const datasetId = active?.id;
   if (!datasetId) return null;
 
   const select = (id: string | undefined) => {

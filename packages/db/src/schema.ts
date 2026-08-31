@@ -20,6 +20,7 @@ export const userRole = pgEnum('user_role', ['member', 'admin']);
 export const messageRole = pgEnum('message_role', ['user', 'assistant']);
 export const tableRole = pgEnum('table_role', ['fact', 'dimension', 'date']);
 export const cardinality = pgEnum('cardinality', ['*:1', '1:1', '1:*']);
+export const measureSource = pgEnum('measure_source', ['introspected', 'curated']);
 
 export const users = pgTable('users', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -56,6 +57,13 @@ export const datasets = pgTable('datasets', {
   datasetName: text('dataset_name').notNull(),
   dateMin: text('date_min').notNull(),
   dateMax: text('date_max').notNull(),
+  /**
+   * Free text an admin writes about the model. It reaches every prompt stage and
+   * is the only channel for what introspection cannot infer: what an
+   * undescriptive table name means, business vocabulary, or a correction to
+   * something the heuristics deduced wrong.
+   */
+  extraContext: text('extra_context').notNull().default(''),
   lastIntrospectedAt: timestamp('last_introspected_at', { withTimezone: true }),
   createdAt,
 });
@@ -104,6 +112,13 @@ export const datasetMeasures = pgTable(
       .references(() => datasets.id, { onDelete: 'cascade' }),
     name: text('name').notNull(),
     expression: text('expression').notNull(),
+    /**
+     * Curated measures are business vocabulary written by hand, and some hold
+     * prompt guidance rather than executable DAX. Reconciliation deletes only
+     * the rows it introspected, so those survive a re-sync; the `curated`
+     * default keeps every pre-existing row safe.
+     */
+    source: measureSource('source').notNull().default('curated'),
   },
   (t) => [uniqueIndex('dataset_measures_name_idx').on(t.datasetId, t.name)],
 );

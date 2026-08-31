@@ -17,6 +17,14 @@ const envSchema = z.object({
 
   DATASET_SECRET_KEY: z.string().length(64),
   SESSION_COOKIE_SECRET: z.string().min(32),
+
+  /*
+   * Startup only refreshes a catalogue that is missing or stale, and never
+   * blocks `listen`: the API has to come up and serve even when Power BI or the
+   * gateway is down.
+   */
+  INTROSPECT_ON_STARTUP: z.stringbool().default(true),
+  INTROSPECT_MAX_AGE_HOURS: z.coerce.number().int().positive().default(168),
 });
 
 export const env = envSchema.parse(process.env);

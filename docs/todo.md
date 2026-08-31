@@ -67,32 +67,45 @@ palette.
 
 ## P1 — Promised in the plan, not built
 
-### 4. Dataset introspection
+### 4. ~~Dataset introspection~~ — DONE
 
-`POST /api/datasets/:id/introspect` was in the plan and **does not exist**. Today
-the only way to get a dataset is `pnpm db:seed`, which hardcodes the Iowa model.
+`POST /api/datasets/:id/introspect` exists, and the API refreshes any stale
+catalogue at boot (`INTROSPECT_ON_STARTUP`, `INTROSPECT_MAX_AGE_HOURS`).
+`apps/api/src/datasets/` holds it: `info-queries.ts` (the four `INFO.*` payloads
+and their parsers), `heuristics.ts` (roles, `is_aggregatable`, type mapping),
+`probes.ts` (sample values and the date range) and `introspect.ts` (the
+reconciling writer).
 
-The schema is ready for many datasets; the ingestion path is not. Implement by
-sending `EVALUATE INFO.TABLES()` / `INFO.COLUMNS()` / `INFO.MEASURES()` /
-`INFO.RELATIONSHIPS()` through the existing gateway `/query`.
+Verified against the live Iowa model: it reproduces the seed's hand-written
+catalogue exactly — the same 4 tables with the same roles, the same 45 columns,
+`Invoices[Bottles Sold]` as the only summable one, and the same
+`2012-01-01 → 2021-12-31` range that was hardcoded. The 16 curated notes, 23
+curated labels and 17 synonyms survived untouched.
 
-**Critical:** upsert on `(table_id, name)` and **preserve `note` and `labels`**.
-Those are hand-curated and are what make the DAX correct — see
-[data-model.md](./data-model.md). Wiping them degrades output quality with no
-error anywhere.
+What `INFO.*` cannot give is filled deterministically, not by an LLM, and what the
+heuristics cannot decide comes back as `warnings` on the report. Anything still
+wrong is corrected by hand through `extra_context` (below).
 
-### 5. Dataset create/update endpoints
+### 5. ~~Dataset create/update endpoints~~ — DONE
 
-Only `GET /`, `GET /:id/context` and `DELETE /:id` exist. There is no
-`POST /api/datasets`, so a new Power BI connection cannot be added without editing
-the seed. `datasetConnectionInputSchema` in contracts is already defined for it and
-unused.
+`POST /api/datasets` (which introspects the new connection immediately) and
+`PATCH /api/datasets/:id` exist, both admin-only.
 
-### 6. Admin curation UI
+The Settings dialog connects a model from the app (`ConnectModelForm.tsx`) and a
+navbar picker switches between them (`lib/dataset-context.tsx`), so chat and
+dashboards follow the selection instead of `datasets[0]`. Verified end to end: a
+second connection registered through the form, introspected on the spot, and
+answered a question correctly with **zero** curated metadata.
 
-There is no way to edit column notes, labels, measures or synonyms except SQL.
-Given how much these matter, a plain table editor behind the `admin` role would pay
-for itself. The role column exists and `DELETE /datasets/:id` already checks it.
+The first account to register is created as `admin` (`routes/auth.ts`). Without
+that there was no way to reach any of this except by editing `role` in SQL.
+
+### 6. Admin curation UI — partially done
+
+A Settings dialog (`apps/web/src/components/SettingsDialog.tsx`, admin-only) edits
+the dataset's `extra_context` and date range and triggers a re-sync. Column notes,
+labels, measures and synonyms are still SQL-only; a plain table editor behind the
+`admin` role would still pay for itself.
 
 ### 7. Observability
 
@@ -180,9 +193,9 @@ Small, real, and cheap to fix:
   `lastQuestion` in a single ref, so pinning an older card in a long conversation
   attaches the most recent question as the widget's `query`. Store the question per
   message instead.
-- **Chat is hardcoded to the first dataset.** `datasets.data?.[0]` in
-  `_authed/chat.tsx`. Dashboards already carry a `datasetId`; chat should too once
-  more than one dataset exists.
+- ~~**Chat is hardcoded to the first dataset.**~~ Both routes now read the active
+  model from `useDataset()`; the picker appears in the navbar once there is more
+  than one.
 - **`useAddWidget(firstDashboard?.id ?? '')`** — the hook is constructed with an
   empty id when no dashboard exists. `onPin` is not passed in that case so it is
   never called, but it is fragile.
@@ -199,6 +212,6 @@ Small, real, and cheap to fix:
 2. P0 #2 — capture the parity fixtures **while `legacy/` still runs**.
 3. P3 #9's first three bullets — the pure-function tests, an hour of work.
 4. P0 #3 — look at the UI, fix what is ugly.
-5. P1 #4 and #5 — introspection and dataset CRUD, which is what makes this
-   multi-tenant in practice rather than just in schema.
+5. ~~P1 #4 and #5 — introspection and dataset CRUD~~ — done, including the
+   connection form and the dataset picker. The app is multi-model in practice.
 6. Everything else by whatever the product needs.

@@ -66,7 +66,7 @@ All prompt text lives in `apps/api/src/pipeline/prompts.ts` and is **in Spanish*
 deliberately — it is tuned against the model and retranslating it would be an
 uncontrolled change. Identifiers around it are English.
 
-`buildInstructions()` assembles three layers:
+`buildInstructions()` assembles four layers:
 
 1. **System context** — what the assistant is, which pipeline stage this is, and
    the standing rules (never mention DAX to the user, never invent figures,
@@ -79,11 +79,17 @@ uncontrolled change. Identifiers around it are English.
 3. **Schema** (optional) — rendered from the `DatasetContext`: tables, columns with
    type, sample value, `[SUMABLE]` marker and curated note; relationships;
    business measures; user synonyms.
+4. **Extra context** (whenever the dataset has any) — the admin's own prose from
+   `datasets.extra_context`, edited in the Settings dialog. It has **no flag**:
+   every stage gets it, including the router and the titler, which see no schema
+   and would otherwise have no idea what a table called `TBL_VTA_CAB` holds.
 
 The schema section is generated from database rows by `schemaSection()`, but its
 **output format matches the MVP's `esquema_para_prompt()` exactly**, because the
 prompts are tuned against that layout. If you change the rendering, re-run the
-parity harness.
+parity harness. That is why extra context is its own section rather than an
+addition to `schemaSection` — `prompts.test.ts` asserts the schema block stays
+byte-identical whether or not extra context is present.
 
 `describeRequiredShape()` renders the decision into the instruction block the
 generator receives.

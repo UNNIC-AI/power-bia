@@ -15,6 +15,13 @@
       "when": 1787923801522,
       "tag": "0001_clear_warbound",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1788162582108,
+      "tag": "0002_safe_rhino",
+      "breakpoints": true
     }
   ]
 }

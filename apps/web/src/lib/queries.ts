@@ -5,8 +5,11 @@ import type {
   ConversationWithMessages,
   Dashboard,
   DashboardSummary,
+  DatasetConnectionInput,
+  DatasetSettingsInput,
   DatasetSummary,
   FilterSelection,
+  IntrospectionReport,
   Locale,
   QueryResponse,
   User,
@@ -67,6 +70,44 @@ export function useDatasets() {
     queryKey: keys.datasets,
     queryFn: () => api.get<DatasetSummary[]>('/datasets'),
     staleTime: 5 * 60_000,
+  });
+}
+
+/**
+ * Registers a Power BI connection. The API introspects it before responding, so
+ * this is slow — and it resolves even when introspection failed, leaving a
+ * dataset whose credentials the admin can correct and re-sync.
+ */
+export function useCreateDataset() {
+  const client = useQueryClient();
+
+  return useMutation({
+    mutationFn: (input: DatasetConnectionInput) => api.post<DatasetSummary>('/datasets', input),
+    onSuccess: () => client.invalidateQueries({ queryKey: keys.datasets }),
+  });
+}
+
+export function useUpdateDatasetSettings() {
+  const client = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, ...settings }: DatasetSettingsInput & { id: string }) =>
+      api.patch<DatasetSummary>(`/datasets/${id}`, settings),
+    onSuccess: () => client.invalidateQueries({ queryKey: keys.datasets }),
+  });
+}
+
+/**
+ * Rediscovers the Power BI model. Slow by nature — it issues several DAX queries
+ * against the customer's capacity — so the caller shows a pending state rather
+ * than assuming it returns quickly.
+ */
+export function useIntrospectDataset() {
+  const client = useQueryClient();
+
+  return useMutation({
+    mutationFn: (id: string) => api.post<IntrospectionReport>(`/datasets/${id}/introspect`),
+    onSuccess: () => client.invalidateQueries({ queryKey: keys.datasets }),
   });
 }
 

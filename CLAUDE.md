@@ -41,7 +41,7 @@ Plan original: `~/.config/claude/plans/functional-snuggling-micali.md`
   fuera del devshell.
 - **Backend:** Fastify 5 + AI SDK 7 + Drizzle + Postgres 17
 - **Gateway DAX:** .NET 10 minimal API sobre ADOMD.NET (XMLA)
-- **Frontend:** React 19 + Tailwind 4 + DaisyUI 5 + Radix primitives + TanStack Router/Query + Recharts
+- **Frontend:** React 19 + Tailwind 4 + DaisyUI 5 + Radix primitives + TanStack Router/Query + Recharts + react-day-picker
 - **Lint/format:** Biome. **Tests:** Vitest.
 
 ### AI SDK 7 — diferencias que importan
@@ -68,7 +68,8 @@ apps/api/src/
 ├─ auth/                  scrypt + sesiones opacas en Postgres
 ├─ cards/                 build.ts (el port de construir_card) + table.ts + reduce.ts
 ├─ dax/                   columns · sanitize · filters · executor
-├─ datasets/context.ts    DatasetContext desde la BD + resolución de etiquetas
+├─ datasets/              context.ts (DatasetContext + etiquetas) · introspect.ts
+│                         (INFO.* → catálogo) · heuristics.ts · probes.ts
 ├─ pipeline/              prompts.ts (español, afinados) · stages.ts · run.ts
 └─ routes/                auth · chat · conversations · dashboards · datasets
 
@@ -105,6 +106,30 @@ legacy/                   MVP Python original, aún ejecutable
   al generador la forma exacta de datos que debe producir, y es la razón de que los gráficos
   salgan bien. No lo convertías en un agente con tools sin perder esto.
 - **El contexto de seguimiento se lee de la tabla `messages`**, no de memoria del proceso.
+- **El catálogo del modelo se descubre con `INFO.*`, no se escribe a mano.** Al arrancar,
+  la API refresca cualquier dataset con catálogo ausente o caducado
+  (`INTROSPECT_ON_STARTUP`, `INTROSPECT_MAX_AGE_HOURS`), sin bloquear el `listen` y sin
+  caerse si Power BI no responde. Lo que `INFO.*` no da (rol de tabla, `is_aggregatable`,
+  valores de ejemplo, rango de fechas) lo rellenan **heurísticas deterministas**, nunca un
+  LLM: `apps/api/src/datasets/heuristics.ts`.
+- **La re-introspección jamás toca la capa curada.** `note` y `labels` de
+  `dataset_columns`, los sinónimos y las medidas con `source = 'curated'` sobreviven a
+  cualquier sincronización. Es la invariante del proyecto y `introspect.test.ts` la vigila.
+- **`datasets.extra_context` es una cuarta capa del prompt.** Texto libre que escribe un
+  admin en el modal de Ajustes; se inyecta en las 8 etapas, también en el enrutador y el
+  titulador, que no reciben esquema. Es la vía para corregir lo que las heurísticas
+  deduzcan mal sin tocar código.
+- **El primer usuario que se registra es admin** (`routes/auth.ts`). `POST /register` crea
+  `member` siempre a partir del segundo; sin este arranque no había forma de llegar a los
+  ajustes ni a la introspección salvo editando `role` a mano en SQL.
+- **El modelo activo vive en `lib/dataset-context.tsx`**, no en `datasets[0]`. El selector
+  de la barra superior aparece solo cuando hay más de uno, y la elección se recuerda en
+  `localStorage`.
+- **El calendario es react-day-picker con el estilado de DaisyUI.** La clase
+  `.react-day-picker` de DaisyUI ya trae la superficie (fondo, borde, radio), el rango
+  (`rdp-range_*`) y los desplegables de mes/año, así que **no se importa la hoja de estilos
+  de la librería** ni se le pone `bg`/`border` al contenedor. DaisyUI también soporta Cally,
+  pero es un web component: react-day-picker se integra sin declarar elementos ni tipos.
 
 ---
 

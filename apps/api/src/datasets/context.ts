@@ -25,6 +25,7 @@ export async function loadDatasetContext(
     id: dataset.id,
     name: dataset.name,
     description: dataset.description,
+    extraContext: dataset.extraContext,
     dateRange: { min: dataset.dateMin, max: dataset.dateMax },
     tables: dataset.tables.map((table) => ({
       name: table.name,

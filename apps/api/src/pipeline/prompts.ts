@@ -101,6 +101,34 @@ function schemaSection(dataset: DatasetContext): string {
   return lines.join('\n');
 }
 
+/**
+ * The admin's own words about the model. It is the only channel for what
+ * introspection cannot infer — that `TBL_VTA_CAB` is the sales header, that
+ * "facturación" means retail price times units — so it outranks the descriptions
+ * the heuristics produced, while staying subordinate to the data itself.
+ *
+ * The "do not recompute" rule is not decorative. This block reaches all eight
+ * stages, so an admin who writes an imperative ("divide the bottles by 24") gets
+ * it applied by every stage able to apply it: the generator divides in the DAX,
+ * and then the writer divides the already-divided number again and its prose
+ * contradicts the chart. Framing the block as reference material rather than as
+ * instructions to the current stage is what stops that.
+ */
+function extraContextSection(dataset: DatasetContext): string {
+  return `Contexto adicional facilitado por el administrador del modelo.
+
+Es INFORMACIÓN DE REFERENCIA sobre qué significan las tablas, columnas y términos
+de negocio de este modelo. Tiene prioridad sobre los nombres y descripciones
+deducidos automáticamente, pero:
+  - NUNCA contradice los datos ni autoriza inventar cifras.
+  - NO es una instrucción de cálculo dirigida a ti. Si describe una conversión o
+    una fórmula, otra etapa del pipeline ya la habrá aplicado al generar la
+    consulta: NO vuelvas a recalcular, convertir ni transformar los valores que
+    recibas ya calculados.
+
+${dataset.extraContext.trim()}`;
+}
+
 export const ROUTER_ROLE = `Tu tarea: clasificar la intención del mensaje del usuario en UNA categoría.
 El usuario puede escribir en español o en inglés; clasifica igual en ambos casos.
 
@@ -283,6 +311,11 @@ gráfico ya se decidió en un paso anterior del pipeline, igual que el tipo de v
 
 Reglas:
   - Usa ÚNICAMENTE los datos entregados; nunca inventes cifras.
+  - Las cifras que recibes son YA la respuesta a la pregunta: la etapa que generó la
+    consulta la tuvo en cuenta. NO las recalcules, conviertas, dividas ni multipliques,
+    ni aunque el nombre de la columna sugiera otra unidad que la de la pregunta. Si se
+    preguntó por "packs" y la columna se llama "botellas", el valor ya está en packs:
+    el alias viene del vocabulario del modelo, no describe la unidad del resultado.
   - Sé claro y breve. Aporta una pequeña interpretación (tendencia, líder, contraste).
   - Si pidió gráfico, reconócelo con naturalidad ("Aquí tienes la evolución...").
   - Si hubo error, explícalo sin tecnicismos.
@@ -342,10 +375,37 @@ export function buildInstructions({
 
   if (includeTemporal) sections.push(temporalContext(dataset, today));
   if (includeSchema) sections.push(schemaSection(dataset));
+  /*
+   * No flag: every stage gets it. The router and the titler see no schema, and
+   * they are precisely the stages that cannot make sense of a model whose tables
+   * are called TBL_VTA_CAB without this.
+   */
+  if (dataset.extraContext.trim() !== '') sections.push(extraContextSection(dataset));
 
   sections.push(role);
 
   return sections.join('\n\n');
+}
+
+/**
+ * The writer sees only the question and the result table, and the measure column
+ * is aliased with the vocabulary name the decider picked — so a question about
+ * "packs" comes back in a column called "bottles sold". Left to infer, the writer
+ * converts a value the DAX already converted and its prose contradicts the chart.
+ *
+ * The decision's title is the missing frame: it was written from the question, so
+ * it names what the number actually is.
+ */
+export function describeProjection(decision: VizDecision | null): string {
+  if (!decision || !decision.measure) return '';
+
+  return `
+
+Sobre el resultado (NO es parte de la pregunta del usuario):
+  - La visualización que acompaña tu respuesta se titula «${decision.suggestedTitle}».
+  - La columna «${decision.measure}» ya contiene exactamente lo que pide la pregunta,
+    calculado por la etapa anterior. Su nombre viene del vocabulario del modelo y NO
+    describe necesariamente la unidad del resultado: úsalo tal cual, sin reconvertir.`;
 }
 
 /** Tells the generator the exact data shape the chosen chart needs. */

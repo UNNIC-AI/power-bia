@@ -189,6 +189,7 @@ async function answerQuery(input: PipelineInput, decision: VizDecision): Promise
       text,
       result: table,
       error: outcome.ok ? null : outcome.error,
+      decision,
       dataset,
       locale,
     }),

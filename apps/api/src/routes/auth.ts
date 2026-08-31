@@ -26,9 +26,21 @@ export async function authRoutes(app: FastifyInstance) {
     });
     if (existing) return reply.code(409).send({ message: 'Email already registered' });
 
+    /*
+     * The first account to register owns the instance. Without this there is no
+     * way to become an admin except by hand in SQL, which makes dataset settings
+     * and introspection unreachable on a fresh deployment.
+     */
+    const anyUser = await app.db.query.users.findFirst();
+
     const [user] = await app.db
       .insert(schema.users)
-      .values({ email, displayName, passwordHash: await hashPassword(password) })
+      .values({
+        email,
+        displayName,
+        passwordHash: await hashPassword(password),
+        role: anyUser ? 'member' : 'admin',
+      })
       .returning();
     if (!user) return reply.code(500).send({ message: 'Could not create user' });
 

@@ -36,14 +36,21 @@ first.
 
 ### Datasets — `/api/datasets`
 
-| Method | Path | Notes |
-|---|---|---|
-| GET | `/` | Summaries: name, description, date range, table and measure counts |
-| GET | `/:id/context` | The full `DatasetContext` — the same structure the prompts consume |
-| DELETE | `/:id` | Admin only (403 otherwise) |
+| Method | Path | Body | Notes |
+|---|---|---|---|
+| GET | `/` | — | Summaries: name, description, extra context, date range, table and measure counts |
+| GET | `/:id/context` | — | The full `DatasetContext` — the same structure the prompts consume |
+| POST | `/` | `datasetConnectionInputSchema` | Registers a connection and introspects it immediately. Admin only. 201 |
+| PATCH | `/:id` | `datasetSettingsInputSchema` | `description`, `extraContext`, `dateRange`. Admin only |
+| POST | `/:id/introspect` | — | Rediscovers the model. Returns an `introspectionReportSchema`. Admin only. 422 with Power BI's own error text on failure |
+| DELETE | `/:id` | — | Admin only (403 otherwise) |
 
-There is **no** `POST /api/datasets`. Datasets are created by the seed script
-only. See [todo.md](./todo.md).
+Every admin route goes through `requireAdmin` in `app.ts`, which throws a 403 with
+`{ "message": "Admin only" }`.
+
+`POST /:id/introspect` is the only endpoint that can take tens of seconds: it
+issues four `INFO.*` queries, one sample-value query per table and one date-range
+query, all through the gateway. It is idempotent.
 
 ### Chat — `/api`
 

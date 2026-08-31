@@ -53,6 +53,9 @@ catalog:
   tailwindcss: ^4.3.3
   "@tailwindcss/vite": ^4.3.3
   daisyui: ^5.7.16
+  # DaisyUI ships the styling for this one under `.react-day-picker`, range and
+  # caption dropdowns included, so the library's own stylesheet is not imported.
+  "react-day-picker": ^10.0.1
   # Import from the package root, not `dist/esm/icons/IconX.mjs` — the per-icon
   # files ship no `.d.ts`, so deep imports are untyped. The barrel is safe: the
   # package is ESM with `sideEffects: false`, so Rollup drops the ~5.9k unused

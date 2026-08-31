@@ -47,6 +47,8 @@ export const datasetContextSchema = z.object({
   id: z.uuid(),
   name: z.string(),
   description: z.string(),
+  /** Admin-written prose about the model, injected into every prompt stage. */
+  extraContext: z.string(),
   dateRange: z.object({ min: z.iso.date(), max: z.iso.date() }),
   tables: z.array(datasetTableSchema),
   relationships: z.array(datasetRelationshipSchema),
@@ -58,6 +60,7 @@ export const datasetSummarySchema = z.object({
   id: z.uuid(),
   name: z.string(),
   description: z.string(),
+  extraContext: z.string(),
   dateRange: z.object({ min: z.iso.date(), max: z.iso.date() }),
   tableCount: z.number().int(),
   measureCount: z.number().int(),
@@ -71,6 +74,40 @@ export const datasetConnectionInputSchema = z.object({
   clientSecret: z.string().min(1),
   workspaceName: z.string().min(1),
   datasetName: z.string().min(1),
+});
+
+/** What the settings dialog can change. Everything else comes from introspection. */
+export const datasetSettingsInputSchema = z.object({
+  description: z.string().max(1_000).optional(),
+  /*
+   * Capped because it rides on every prompt of every stage: eight LLM calls per
+   * question in the worst case, so an unbounded field is an unbounded bill.
+   */
+  extraContext: z.string().max(8_000).optional(),
+  dateRange: z.object({ min: z.iso.date(), max: z.iso.date() }).optional(),
+});
+
+const reconcileCountSchema = z.object({
+  created: z.number().int(),
+  updated: z.number().int(),
+  removed: z.number().int(),
+});
+
+/**
+ * The outcome of one introspection run. `warnings` carries everything the
+ * heuristics could not decide — an undetected date table, hidden tables that
+ * were skipped — because those are exactly what the admin has to fix by hand.
+ */
+export const introspectionReportSchema = z.object({
+  datasetId: z.uuid(),
+  tables: reconcileCountSchema,
+  columns: reconcileCountSchema,
+  measures: reconcileCountSchema,
+  relationships: reconcileCountSchema,
+  dateRange: z.object({ min: z.iso.date(), max: z.iso.date() }),
+  warnings: z.array(z.string()),
+  durationMs: z.number().int(),
+  lastIntrospectedAt: z.iso.datetime(),
 });
 
 export const daxResultSchema = z.object({
@@ -89,4 +126,6 @@ export type DatasetSynonym = z.infer<typeof datasetSynonymSchema>;
 export type DatasetContext = z.infer<typeof datasetContextSchema>;
 export type DatasetSummary = z.infer<typeof datasetSummarySchema>;
 export type DatasetConnectionInput = z.infer<typeof datasetConnectionInputSchema>;
+export type DatasetSettingsInput = z.infer<typeof datasetSettingsInputSchema>;
+export type IntrospectionReport = z.infer<typeof introspectionReportSchema>;
 export type DaxResult = z.infer<typeof daxResultSchema>;

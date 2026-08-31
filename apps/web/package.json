@@ -20,6 +20,7 @@
     "i18next": "catalog:",
     "radix-ui": "catalog:",
     "react": "catalog:",
+    "react-day-picker": "catalog:",
     "react-dom": "catalog:",
     "react-grid-layout": "catalog:",
     "react-i18next": "catalog:",

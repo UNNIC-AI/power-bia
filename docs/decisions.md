@@ -47,6 +47,37 @@ introspectable. Introspection can find names and types but not "this is the only
 summable column" — and those notes are what make the DAX correct. See
 [data-model.md](./data-model.md) for the upsert requirement.
 
+### Deterministic heuristics, not an LLM, for the introspection gap **[user]**
+
+`INFO.*` returns names, types, relationships and real model measures. It does not
+return table roles, `is_aggregatable`, sample values or the date range — all of
+which the prompts lean on. An LLM enrichment pass was considered and rejected:
+these rules are cheap, reproducible and testable, and a wrong guess here is
+invisible until the DAX comes back wrong.
+
+The rules live in `apps/api/src/datasets/heuristics.ts`. A table is `date` when
+its `DataCategory` is `Time` or a fact joins to it on a datetime column, `fact`
+when it is the many-side of a relationship, `dimension` otherwise. A column is
+aggregatable when it is numeric, not a key, not a relationship endpoint, not in a
+date table, not `SummarizeBy = None`, and its name does not read like a unit price
+or a rate. That last rule errs towards non-additive on purpose: it only drops the
+`[SUMABLE]` hint, whereas a wrongly summable price actively invites bad DAX.
+
+Against the live Iowa model these reproduce the hand-written seed exactly. What
+they cannot decide is reported as `warnings` rather than guessed.
+
+### Extra context is a fourth prompt layer **[user]**
+
+`datasets.extra_context` is admin-written prose, pushed into `buildInstructions`
+after the schema and before the role — **with no flag, so every stage gets it**.
+The router and the titler receive no schema, and they are precisely the stages
+that cannot make sense of a model whose tables are called `TBL_VTA_CAB`.
+
+It sits in its own section rather than inside `schemaSection`, because that
+function's output format is tuned against the MVP's `esquema_para_prompt()` and
+must stay byte-identical — `prompts.test.ts` asserts that it does. Capped at 8k
+characters: it rides on up to eight LLM calls per question.
+
 ---
 
 ## Security

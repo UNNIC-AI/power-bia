@@ -4,12 +4,12 @@ import { useTranslation } from 'react-i18next';
 import { ConfirmDialog } from '../../components/ConfirmDialog.tsx';
 import { DashboardCanvas } from '../../components/dashboard/DashboardCanvas.tsx';
 import { Sidebar } from '../../components/Sidebar.tsx';
+import { useDataset } from '../../lib/dataset-context.tsx';
 import { formatDay } from '../../lib/format.ts';
 import {
   useCreateDashboard,
   useDashboard,
   useDashboards,
-  useDatasets,
   useDeleteDashboard,
   useRegenerateDashboardName,
   useRenameDashboard,
@@ -29,7 +29,7 @@ function DashboardsRoute() {
   const navigate = useNavigate();
   const { d: selectedId } = Route.useSearch();
 
-  const datasets = useDatasets();
+  const { active } = useDataset();
   const dashboards = useDashboards();
   const createDashboard = useCreateDashboard();
   const renameDashboard = useRenameDashboard();
@@ -39,7 +39,7 @@ function DashboardsRoute() {
   /** Deleting is irreversible, so the row is held here until it is confirmed. */
   const [pendingDelete, setPendingDelete] = useState<{ id: string; name: string } | null>(null);
 
-  const datasetId = datasets.data?.[0]?.id;
+  const datasetId = active?.id;
   const activeId = selectedId ?? dashboards.data?.[0]?.id;
   const dashboard = useDashboard(activeId ?? null);
 
