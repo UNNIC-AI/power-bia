@@ -9,7 +9,7 @@ import type { DaxExecutor } from '../dax/executor.js';
  * The invariant this whole feature stands on: re-introspecting a model must not
  * touch the curated layer. `note` and `labels` on `dataset_columns`, and every
  * row in `dataset_synonyms`, are hand-written and are what make the generated DAX
- * correct — wiping them degrades output quality with no error anywhere.
+ * correct - wiping them degrades output quality with no error anywhere.
  *
  * Runs against the development database and skips without one, so CI stays
  * green. The Power BI side is a stub: the point is the reconciliation, not the
@@ -24,7 +24,7 @@ function result(columns: string[], rows: (string | number | boolean | null)[][])
   return { columns, rows, durationMs: 1 };
 }
 
-/** Two tables, one relationship, one measure — enough to exercise every branch. */
+/** Two tables, one relationship, one measure - enough to exercise every branch. */
 const RESPONSES: Record<string, DaxResult> = {
   'EVALUATE INFO.TABLES()': result(
     ['[ID]', '[Name]', '[DataCategory]', '[IsHidden]', '[Description]'],
@@ -82,6 +82,10 @@ const stubExecutor: DaxExecutor = {
         [aliases.map((_, index) => `v${index}`)],
       ),
     };
+  },
+
+  async health() {
+    return true;
   },
 };
 

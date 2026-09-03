@@ -1,7 +1,7 @@
 import { createHash, randomBytes } from 'node:crypto';
 import type { User } from '@powerbia/contracts';
 import { type Database, schema } from '@powerbia/db';
-import { and, eq, gt, lt } from 'drizzle-orm';
+import { and, eq, gt, lt, ne } from 'drizzle-orm';
 
 export const SESSION_COOKIE = 'powerbia_session';
 const TTL_MS = 30 * 24 * 60 * 60 * 1000;
@@ -46,4 +46,21 @@ export async function deleteSession(db: Database, token: string): Promise<void> 
 
 export async function deleteExpiredSessions(db: Database): Promise<void> {
   await db.delete(schema.sessions).where(lt(schema.sessions.expiresAt, new Date()));
+}
+
+/**
+ * A password change has to invalidate whatever else was holding a cookie for
+ * that account - that is the point of changing it. `keepToken` spares the
+ * caller's own session so they are not signed out of the tab they are using.
+ */
+export async function deleteUserSessions(
+  db: Database,
+  userId: string,
+  keepToken?: string,
+): Promise<void> {
+  const owned = eq(schema.sessions.userId, userId);
+
+  await db
+    .delete(schema.sessions)
+    .where(keepToken ? and(owned, ne(schema.sessions.tokenHash, hashToken(keepToken))) : owned);
 }

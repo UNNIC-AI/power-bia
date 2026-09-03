@@ -79,8 +79,9 @@ uncontrolled change. Identifiers around it are English.
 3. **Schema** (optional) — rendered from the `DatasetContext`: tables, columns with
    type, sample value, `[SUMABLE]` marker and curated note; relationships;
    business measures; user synonyms.
-4. **Extra context** (whenever the dataset has any) — the admin's own prose from
-   `datasets.extra_context`, edited in the Settings dialog. It has **no flag**:
+4. **Extra context** (whenever the dataset has any) — the prose in
+   `datasets.extra_context`: written by the LLM from the catalogue the first time
+   the model is introspected, then curated in the Settings dialog. It has **no flag**:
    every stage gets it, including the router and the titler, which see no schema
    and would otherwise have no idea what a table called `TBL_VTA_CAB` holds.
 

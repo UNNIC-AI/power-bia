@@ -6,9 +6,9 @@ import type { Theme } from '../../lib/theme.ts';
  * lightness band, chroma floor, adjacent-pair CVD separation, normal-vision
  * floor, contrast. The dark column was measured on daisyUI `dark` (base-100
  * oklch 25%) and the app now paints `black` (oklch 0%), which only widens the
- * gap between every hue and its surface — the checks hold a fortiori.
+ * gap between every hue and its surface - the checks hold a fortiori.
  *
- * Slots are assigned in fixed order and never cycled — the API folds anything
+ * Slots are assigned in fixed order and never cycled - the API folds anything
  * past the eighth series into "Otros", so a ninth hue is never needed.
  *
  * Light mode carries a contrast warning on aqua, yellow and magenta (below 3:1

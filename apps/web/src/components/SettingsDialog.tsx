@@ -1,13 +1,15 @@
 import type { DatasetSummary, Locale } from '@powerbia/contracts';
-import { IconPlus, IconRefresh } from '@tabler/icons-react';
-import { Collapsible, Dialog } from 'radix-ui';
+import { IconRefresh, IconSparkles } from '@tabler/icons-react';
+import { Dialog } from 'radix-ui';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useDataset } from '../lib/dataset-context.tsx';
 import { formatDay, formatTime } from '../lib/format.ts';
-import { useIntrospectDataset, useUpdateDatasetSettings } from '../lib/queries.ts';
-import { ConnectModelForm } from './ConnectModelForm.tsx';
-import { DateRangePicker } from './DateRangePicker.tsx';
+import {
+  useIntrospectDataset,
+  useRegenerateDatasetContext,
+  useUpdateDatasetSettings,
+} from '../lib/queries.ts';
+import { ConfirmDialog } from './ConfirmDialog.tsx';
 
 interface Props {
   open: boolean;
@@ -26,36 +28,36 @@ const EXTRA_CONTEXT_LIMIT = 8_000;
  * the user can dismiss, not a question that demands an answer.
  *
  * Styled from DaisyUI tokens rather than with `modal-box`, which is transparent
- * and scaled down until an enclosing `.modal` opens it — on Radix content that
+ * and scaled down until an enclosing `.modal` opens it - on Radix content that
  * renders a perfectly invisible dialog.
+ *
+ * What this dialog does NOT do is change which Power BI model the app talks to.
+ * That comes from `PBI_*` in the server environment; here it is shown read-only.
  */
 export function SettingsDialog({ open, dataset, locale, onClose }: Props) {
   const { t } = useTranslation();
   const save = useUpdateDatasetSettings();
-  const { select } = useDataset();
-  const [connecting, setConnecting] = useState(false);
   const introspect = useIntrospectDataset();
+  const regenerate = useRegenerateDatasetContext();
+  const [confirmingRegenerate, setConfirmingRegenerate] = useState(false);
 
   const [extraContext, setExtraContext] = useState('');
-  const [dateMin, setDateMin] = useState('');
-  const [dateMax, setDateMax] = useState('');
 
   /*
-   * Re-seeded whenever the dialog opens or a sync rewrites the date range, so a
-   * draft is never silently based on values the server has since changed.
+   * Re-seeded whenever the dialog opens or the stored text changes, so a draft is
+   * never silently based on a version the server has since rewritten - which is
+   * exactly what "reprocess" does.
    */
   useEffect(() => {
     if (!open || !dataset) return;
 
     setExtraContext(dataset.extraContext);
-    setDateMin(dataset.dateRange.min);
-    setDateMax(dataset.dateRange.max);
   }, [open, dataset]);
 
   /*
-   * With no model connected there is nothing to configure — but this dialog is
-   * also how the first one gets connected, so it must still open and show only
-   * the connection form.
+   * With no model connected there is nothing to configure, and no form that could
+   * connect one: pointing the app at a model is an environment change plus a
+   * restart. The dialog still opens and says so.
    */
   if (!dataset) {
     return (
@@ -63,14 +65,17 @@ export function SettingsDialog({ open, dataset, locale, onClose }: Props) {
         <Dialog.Portal>
           <Dialog.Overlay className="fixed inset-0 z-40 bg-black/40" />
           <Dialog.Content className={SURFACE}>
-            <Dialog.Title className="text-base font-semibold">
-              {t('settings.connectTitle')}
-            </Dialog.Title>
-            <Dialog.Description className="text-base-content/70 mt-1 mb-4 text-sm">
-              {t('settings.connectFirstHelp')}
+            <Dialog.Title className="text-base font-semibold">{t('settings.title')}</Dialog.Title>
+            <Dialog.Description className="text-base-content/70 mt-1 text-sm">
+              {t('settings.noDataset')}
             </Dialog.Description>
-            <div className="-mx-1 overflow-y-auto px-1">
-              <ConnectModelForm onConnected={() => onClose()} />
+            <p className="text-base-content/60 mt-3 text-xs">{t('settings.sourceHelp')}</p>
+            <div className="mt-6 flex justify-end">
+              <Dialog.Close asChild>
+                <button type="button" className="btn btn-ghost btn-sm">
+                  {t('common.close')}
+                </button>
+              </Dialog.Close>
             </div>
           </Dialog.Content>
         </Dialog.Portal>
@@ -79,15 +84,14 @@ export function SettingsDialog({ open, dataset, locale, onClose }: Props) {
   }
 
   const report = introspect.data;
-  const error = save.error ?? introspect.error;
-  const dirty =
-    extraContext !== dataset.extraContext ||
-    dateMin !== dataset.dateRange.min ||
-    dateMax !== dataset.dateRange.max;
+  const error = save.error ?? introspect.error ?? regenerate.error;
+  const dirty = extraContext !== dataset.extraContext;
+  const busy = introspect.isPending || regenerate.isPending;
 
   const close = () => {
     save.reset();
     introspect.reset();
+    regenerate.reset();
     onClose();
   };
 
@@ -99,7 +103,7 @@ export function SettingsDialog({ open, dataset, locale, onClose }: Props) {
           <div>
             <Dialog.Title className="text-base font-semibold">{t('settings.title')}</Dialog.Title>
             <Dialog.Description className="text-base-content/70 mt-1 text-sm">
-              {dataset.name} ·{' '}
+              {dataset.name} -{' '}
               {t('settings.counts', {
                 tables: dataset.tableCount,
                 measures: dataset.measureCount,
@@ -120,34 +124,58 @@ export function SettingsDialog({ open, dataset, locale, onClose }: Props) {
             footer off-screen, precisely when the user wants to reach Save.
           */}
           <div className="-mx-1 flex flex-1 flex-col gap-4 overflow-y-auto px-1 py-4">
+            <div className="bg-base-200 rounded-box flex flex-col gap-1 p-3">
+              <span className="text-sm font-medium">{t('settings.source')}</span>
+              <span className="font-mono text-xs">
+                {dataset.source.workspaceName || '-'} / {dataset.source.datasetName || '-'}
+              </span>
+              <span className="text-base-content/60 text-xs">{t('settings.sourceHelp')}</span>
+            </div>
+
             <label className="flex flex-col gap-1">
               <span className="text-sm font-medium">{t('settings.extraContext')}</span>
               <span className="text-base-content/60 text-xs">{t('settings.extraContextHelp')}</span>
               <textarea
-                className="textarea textarea-bordered min-h-40 w-full text-sm"
+                className="textarea textarea-bordered min-h-56 w-full text-sm"
                 value={extraContext}
                 maxLength={EXTRA_CONTEXT_LIMIT}
                 placeholder={t('settings.extraContextPlaceholder')}
                 onChange={(event) => setExtraContext(event.target.value)}
               />
-              <span className="text-base-content/40 self-end text-xs">
-                {extraContext.length} / {EXTRA_CONTEXT_LIMIT}
+              <span className="flex items-center justify-between gap-2 text-xs">
+                <span className="text-base-content/50">
+                  {/* Blank while the field has never been written, by anyone. */}
+                  {dataset.extraContextGeneratedAt
+                    ? t('settings.contextGeneratedAt', {
+                        day: formatDay(dataset.extraContextGeneratedAt, locale),
+                        time: formatTime(dataset.extraContextGeneratedAt, locale),
+                      })
+                    : dataset.extraContext.trim() === ''
+                      ? ''
+                      : t('settings.contextEdited')}
+                </span>
+                <span className="text-base-content/40">
+                  {extraContext.length} / {EXTRA_CONTEXT_LIMIT}
+                </span>
               </span>
             </label>
 
-            <fieldset className="flex flex-col gap-1">
-              <legend className="text-sm font-medium">{t('settings.dateRange')}</legend>
-              <span className="text-base-content/60 text-xs">{t('settings.dateRangeHelp')}</span>
-              <DateRangePicker
-                min={dateMin}
-                max={dateMax}
-                locale={locale}
-                onChange={({ min, max }) => {
-                  setDateMin(min);
-                  setDateMax(max);
-                }}
-              />
-            </fieldset>
+            <div className="flex flex-col gap-1">
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm self-start"
+                disabled={busy}
+                onClick={() => setConfirmingRegenerate(true)}
+              >
+                {regenerate.isPending ? (
+                  <span className="loading loading-spinner loading-xs" />
+                ) : (
+                  <IconSparkles size={14} stroke={1.75} />
+                )}
+                {regenerate.isPending ? t('settings.reprocessing') : t('settings.reprocess')}
+              </button>
+              <span className="text-base-content/60 text-xs">{t('settings.reprocessHelp')}</span>
+            </div>
 
             {error && (
               <div role="alert" className="alert alert-error py-2 text-sm">
@@ -169,6 +197,9 @@ export function SettingsDialog({ open, dataset, locale, onClose }: Props) {
                       report.tables.removed + report.columns.removed + report.measures.removed,
                   })}
                 </span>
+                {report.contextGenerated && (
+                  <span className="text-base-content/70">{t('settings.syncWroteContext')}</span>
+                )}
                 {report.warnings.length > 0 && (
                   <ul className="text-warning mt-1 list-inside list-disc">
                     {report.warnings.map((warning) => (
@@ -178,35 +209,14 @@ export function SettingsDialog({ open, dataset, locale, onClose }: Props) {
                 )}
               </div>
             )}
-
-            <Collapsible.Root
-              open={connecting}
-              onOpenChange={setConnecting}
-              className="border-base-300 border-t pt-4"
-            >
-              <Collapsible.Trigger asChild>
-                <button type="button" className="btn btn-ghost btn-sm -ml-2">
-                  <IconPlus size={14} stroke={1.75} />
-                  {t('settings.connectTitle')}
-                </button>
-              </Collapsible.Trigger>
-              <Collapsible.Content className="pt-3">
-                <ConnectModelForm
-                  onConnected={(id) => {
-                    select(id);
-                    setConnecting(false);
-                  }}
-                />
-              </Collapsible.Content>
-            </Collapsible.Root>
           </div>
 
           <div className="border-base-300 flex shrink-0 items-center justify-between gap-2 border-t pt-4">
             <button
               type="button"
               className="btn btn-ghost btn-sm"
-              disabled={introspect.isPending}
-              onClick={() => introspect.mutate(dataset.id)}
+              disabled={busy}
+              onClick={() => introspect.mutate({ locale })}
             >
               {introspect.isPending ? (
                 <span className="loading loading-spinner loading-xs" />
@@ -226,13 +236,7 @@ export function SettingsDialog({ open, dataset, locale, onClose }: Props) {
                 type="button"
                 className="btn btn-primary btn-sm"
                 disabled={!dirty || save.isPending}
-                onClick={() =>
-                  save.mutate({
-                    id: dataset.id,
-                    extraContext,
-                    dateRange: { min: dateMin, max: dateMax },
-                  })
-                }
+                onClick={() => save.mutate({ extraContext })}
               >
                 {save.isPending && <span className="loading loading-spinner loading-xs" />}
                 {t('settings.save')}
@@ -241,6 +245,19 @@ export function SettingsDialog({ open, dataset, locale, onClose }: Props) {
           </div>
         </Dialog.Content>
       </Dialog.Portal>
+
+      {/* Reprocessing throws away whatever is in the field, edits included. */}
+      <ConfirmDialog
+        open={confirmingRegenerate}
+        title={t('settings.reprocess')}
+        body={t('settings.reprocessConfirm')}
+        confirmLabel={t('settings.reprocess')}
+        onCancel={() => setConfirmingRegenerate(false)}
+        onConfirm={() => {
+          setConfirmingRegenerate(false);
+          regenerate.mutate({ locale });
+        }}
+      />
     </Dialog.Root>
   );
 }

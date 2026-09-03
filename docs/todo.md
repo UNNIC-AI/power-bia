@@ -17,14 +17,14 @@ The pipeline works against live Power BI and OpenAI. Four questions answered in
 ~8s each, covering `kpi`, `line`, `bar` and the out-of-range refusal. The gateway
 executes DAX over XMLA, and `INFO.TABLES()` works on the capacity.
 
-Setup that made it work is in [../SETUP.md](../SETUP.md). Two things learned:
+Setup that made it work is in [setup.md](./setup.md). Two things learned:
 
 - Run the gateway with `dotnet run -c Release` from `services/dax-gateway` for
   local work; it is far quicker than building the container, which still has
   never been built.
-- `pnpm --filter @powerbia/db connection` repoints an existing dataset row at the
-  `PBI_*` in the environment, without the re-seed that would drop conversations
-  and dashboards.
+- Repointing at another model is `PBI_*` plus a restart: the API rewrites the
+  dataset row on boot, reusing it so conversations and dashboards survive. The
+  `db connection` script that used to do this by hand is gone.
 
 Known nit: the writer sometimes formats numbers in its Spanish prose with en-US
 separators (`29,841,264` rather than `29.841.264`). Card values are formatted
@@ -69,7 +69,7 @@ palette.
 
 ### 4. ~~Dataset introspection~~ — DONE
 
-`POST /api/datasets/:id/introspect` exists, and the API refreshes any stale
+`POST /api/dataset/introspect` exists, and the API refreshes any stale
 catalogue at boot (`INTROSPECT_ON_STARTUP`, `INTROSPECT_MAX_AGE_HOURS`).
 `apps/api/src/datasets/` holds it: `info-queries.ts` (the four `INFO.*` payloads
 and their parsers), `heuristics.ts` (roles, `is_aggregatable`, type mapping),
@@ -86,26 +86,39 @@ What `INFO.*` cannot give is filled deterministically, not by an LLM, and what t
 heuristics cannot decide comes back as `warnings` on the report. Anything still
 wrong is corrected by hand through `extra_context` (below).
 
-### 5. ~~Dataset create/update endpoints~~ — DONE
+### 5. ~~Dataset endpoints~~ — DONE, then narrowed
 
-`POST /api/datasets` (which introspects the new connection immediately) and
-`PATCH /api/datasets/:id` exist, both admin-only.
+`PATCH /api/dataset`, `POST /api/dataset/introspect` and
+`POST /api/dataset/context` exist, all admin-only.
 
-The Settings dialog connects a model from the app (`ConnectModelForm.tsx`) and a
-navbar picker switches between them (`lib/dataset-context.tsx`), so chat and
-dashboards follow the selection instead of `datasets[0]`. Verified end to end: a
-second connection registered through the form, introspected on the spot, and
-answered a question correctly with **zero** curated metadata.
+The create and delete endpoints, and the connection form that used them, are gone:
+the Power BI source is `PBI_*` and the API writes it into the row on every boot
+(`datasets/provision.ts`). Changing model is an environment edit plus a restart,
+which also drops the catalogue of the model that was left behind and introspects
+the new one.
 
-The first account to register is created as `admin` (`routes/auth.ts`). Without
-that there was no way to reach any of this except by editing `role` in SQL.
+The list endpoint and the navbar picker are gone too. There is one model and the
+environment names it, so no path carries an id, no request body carries a dataset
+id, and the server resolves the active row itself (`findActiveDataset`). Chat and
+dashboards read it through `useDataset()`, which is now a plain query over
+`GET /api/dataset`.
+
+Self-registration is closed: `POST /auth/register` only answers while there are no
+users at all, and whoever claims an empty instance becomes its `admin`
+(`routes/auth.ts`). Every account after that is created by an admin from the Users
+dialog (`routes/users.ts`), which also resets passwords and removes accounts.
+Members can change their own password and nothing else.
 
 ### 6. Admin curation UI — partially done
 
 A Settings dialog (`apps/web/src/components/SettingsDialog.tsx`, admin-only) edits
-the dataset's `extra_context` and date range and triggers a re-sync. Column notes,
-labels, measures and synonyms are still SQL-only; a plain table editor behind the
-`admin` role would still pay for itself.
+the dataset's `extra_context`, triggers a re-sync, and asks the assistant to
+rewrite that context from the catalogue. The first draft is written automatically
+the first time a model is introspected, so the layer is never empty — which it
+always was while it had to be typed from scratch.
+
+Column notes, labels, measures and synonyms are still SQL-only; a plain table
+editor behind the `admin` role would still pay for itself.
 
 ### 7. Observability
 
@@ -144,37 +157,51 @@ decision can be satisfied by columns already present — is not implemented. Tod
 
 ## P3 — Production readiness
 
-### 8. Deployment
+### 8. ~~Deployment~~ — DONE
 
-`docker-compose.yml` only defines `postgres` and `dax-gateway`. There are no
-Dockerfiles for `apps/api` or `apps/web`, so the full stack cannot come up with one
-command. The API needs a Node image; the web app needs a static build served
-behind something that also proxies `/api` (which is what makes the same-origin
-cookie work in production).
+`apps/api/Dockerfile` and `apps/web/Dockerfile` are multi-stage with `dev` and
+`runtime` targets; `docker-compose.yml` runs every service behind a profile, and
+`docker-compose.prod.yml` is the production shape (runtime targets, no bind
+mounts, resource limits, secrets required rather than defaulted, the gateway
+unpublished, nginx serving the SPA and proxying `/api`). CI builds all three
+images. `/healthz` and `/readyz` exist. Backups, restore and rollback are written
+down in [deployment.md](./deployment.md).
 
-### 9. Tests
+What is left here: nothing blocking, but nobody has restored a dump into a clean
+environment yet, and the restore command in `deployment.md` should be exercised
+once before it is trusted.
 
-Currently 19, covering `cards/build.ts` and `auth/passwords.ts`. Missing:
+### 9. Tests — 80, and both sides are wired
+
+The scaffolding is in place on both sides: 72 in the API and 8 in the web app.
+Route tests go through `buildApp()` and `app.inject()` against a real Postgres
+(a throwaway database per vitest worker); component tests go through the DOM with
+Testing Library, `user-event` and MSW. CI runs both with a Postgres service and
+the suites refuse to skip there.
+
+Still missing, in value order:
 
 - `dax/filters.ts` — `applyFilters` does string surgery around `EVALUATE` and
   `ORDER BY`. It is pure and trivially testable and currently untested. **Highest
   value per line of any test you could write.**
 - `dax/sanitize.ts` — same argument.
 - `dax/columns.ts` — `resolveColumn` bracket/case handling.
-- Route-level tests with `app.inject()` — no HTTP test exists.
+- Route tests for `/api/conversations`, `/api/dashboards` and `/api/users`. Only
+  `/api/auth` and `/api/dataset` are covered.
 - `conversations/store.ts` `loadHistory()` pairing logic.
-- Anything in the frontend. No component tests at all.
+- Component tests for the chat panel and the dashboard canvas.
+- One Playwright path against the compose stack: sign in, ask a question, pin the
+  card. The money path, and the only test that would cover the streaming contract.
 - CI runs `dotnet test` in `services/dax-gateway` and **there are no .NET tests**,
   so that step is decorative.
 
 ### 10. Hardening
 
-- Rate limiting is global (120/min). It should be per-user, and the LLM endpoints
-  deserve a much tighter budget than the CRUD ones.
+- Rate limiting is global (120/min), with a tighter 10/min on login and register.
+  It should be per-user, and the LLM endpoints deserve a much tighter budget than
+  the CRUD ones.
 - `deleteExpiredSessions()` exists in `auth/sessions.ts` and is **never called**.
   Needs a periodic job.
-- `/health` returns `ok` unconditionally. It should check Postgres and the gateway
-  so a load balancer learns something from it.
 - No React error boundary. A render error in one card blanks the app; the MVP had a
   try/catch fallback that rendered text without the chart.
 - No retry or circuit breaking around the gateway. A cold XMLA endpoint is slow on
@@ -212,6 +239,6 @@ Small, real, and cheap to fix:
 2. P0 #2 — capture the parity fixtures **while `legacy/` still runs**.
 3. P3 #9's first three bullets — the pure-function tests, an hour of work.
 4. P0 #3 — look at the UI, fix what is ugly.
-5. ~~P1 #4 and #5 — introspection and dataset CRUD~~ — done, including the
-   connection form and the dataset picker. The app is multi-model in practice.
+5. ~~P1 #4 and #5 — introspection and the dataset endpoints~~ — done. The model
+   itself is chosen in `PBI_*`; the UI curates it and can have it re-read.
 6. Everything else by whatever the product needs.

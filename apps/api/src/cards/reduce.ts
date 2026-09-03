@@ -9,7 +9,7 @@ import {
   toNumber,
 } from './table.js';
 
-/** Matches the frontend chart palette length — more series than this cannot be read. */
+/** Matches the frontend chart palette length - more series than this cannot be read. */
 export const MAX_SERIES = 8;
 export const MAX_CATEGORIES = 15;
 /** ~10 years of monthly points; a safety net for time series. */
@@ -19,7 +19,7 @@ export const MAX_TABLE_ROWS = 1000;
 
 const NOTICES = {
   topSeries: {
-    es: (n: number) => `Mostrando las ${n} categorías principales; el resto agrupado en «Otros».`,
+    es: (n: number) => `Mostrando las ${n} categorías principales; el resto agrupado en "Otros".`,
     en: (n: number) => `Showing the top ${n} categories; the rest grouped into "Other".`,
   },
   topCategories: {

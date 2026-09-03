@@ -22,7 +22,6 @@ type MessageRow = typeof schema.messages.$inferSelect;
 const toConversation = (row: ConversationRow) => ({
   id: row.id,
   title: row.title,
-  datasetId: row.datasetId,
   createdAt: row.createdAt.toISOString(),
   updatedAt: row.updatedAt.toISOString(),
 });

@@ -1,0 +1,26 @@
+.git
+.github
+.idea
+.vscode
+.direnv
+.turbo
+**/.turbo
+
+node_modules
+**/node_modules
+dist
+**/dist
+**/*.tsbuildinfo
+
+.env
+.env.*
+!.env.example
+
+# The original Python MVP is not part of any image.
+legacy
+
+result
+result-*
+docs
+*.md
+!README.md

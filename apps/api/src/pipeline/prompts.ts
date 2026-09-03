@@ -102,10 +102,11 @@ function schemaSection(dataset: DatasetContext): string {
 }
 
 /**
- * The admin's own words about the model. It is the only channel for what
- * introspection cannot infer — that `TBL_VTA_CAB` is the sales header, that
- * "facturación" means retail price times units — so it outranks the descriptions
- * the heuristics produced, while staying subordinate to the data itself.
+ * The prose layer about the model: written by the LLM from the catalogue the
+ * first time the model is connected, then curated by an admin. It is the only
+ * channel for what introspection cannot infer — that `TBL_VTA_CAB` is the sales
+ * header, that "facturación" means retail price times units — so it outranks the
+ * descriptions the heuristics produced, while staying subordinate to the data.
  *
  * The "do not recompute" rule is not decorative. This block reaches all eight
  * stages, so an admin who writes an imperative ("divide the bottles by 24") gets
@@ -115,7 +116,7 @@ function schemaSection(dataset: DatasetContext): string {
  * instructions to the current stage is what stops that.
  */
 function extraContextSection(dataset: DatasetContext): string {
-  return `Contexto adicional facilitado por el administrador del modelo.
+  return `Contexto adicional sobre este modelo, revisado por su administrador.
 
 Es INFORMACIÓN DE REFERENCIA sobre qué significan las tablas, columnas y términos
 de negocio de este modelo. Tiene prioridad sobre los nombres y descripciones
@@ -354,6 +355,58 @@ Reglas:
   - Elige siempre columnas de texto/categoría (no numéricas ni de fecha).
   - "title" es un nombre legible para mostrar al usuario.`;
 
+export const DESCRIBER_ROLE = `Tu tarea: documentar este modelo de datos para que el resto del pipeline pueda usarlo.
+
+Devuelves dos textos:
+
+  "description": UNA frase (máx. 200 caracteres) que diga qué mide el modelo y cuál es el
+  grano de su tabla de hechos. Ej.: "Ventas mayoristas de licor: cada fila es un producto
+  vendido en una tienda en una fecha."
+
+  "extraContext": texto de REFERENCIA (máx. 3.000 caracteres) que se inyectará en todas las
+  etapas del pipeline. Escríbelo en párrafos cortos y viñetas "- ", sin markdown ni títulos
+  decorados, cubriendo en este orden:
+    1. Qué representa el modelo y el grano de la tabla de hechos.
+    2. Para qué sirve cada tabla, y qué significan las columnas cuyo nombre NO es evidente
+       (abreviaturas, prefijos técnicos, claves).
+    3. Vocabulario de negocio: qué palabras usará un usuario no técnico y a qué tabla,
+       columna o medida corresponden.
+    4. Avisos de uso: columnas que NO deben sumarse (precios, ratios, porcentajes), claves
+       subrogadas que no sirven para agrupar ni ordenar, columnas casi duplicadas y cuál es
+       la correcta, y la columna adecuada para ordenar cronológicamente.
+
+Reglas ineludibles:
+  - Usa SOLO lo que aparece en el esquema, en los valores de ejemplo y en el vocabulario de
+    medidas. Si algo no se puede deducir, NO lo inventes: dilo o no lo menciones.
+  - No cites cifras, totales ni conclusiones sobre los datos: no los has visto.
+  - Es material de REFERENCIA, no órdenes: describe ("el precio es unitario, no acumulable"),
+    nunca mandes ("divide entre 24", "multiplica por el precio").
+  - No menciones DAX, XMLA, el pipeline ni a ti mismo.
+  - No repitas el esquema columna a columna: explica lo que el esquema no dice por sí solo.
+  - Si recibes una versión anterior de este texto, conserva todo lo que siga siendo cierto
+    para el esquema actual — es conocimiento que aportó una persona — y elimina o corrige
+    solo lo que ya no encaje.`;
+
+/**
+ * The instructions for writing a model's own context. It gets the schema and
+ * nothing else — no temporal block, because the date range is a fact the prompt
+ * builders inject at query time, and no `extraContext` section, because the
+ * previous version is handed over as material to revise rather than as truth.
+ */
+export function buildDescriberInstructions(options: {
+  dataset: DatasetContext;
+  locale: Locale;
+}): string {
+  const { dataset, locale } = options;
+
+  return [
+    systemContext(dataset, locale),
+    schemaSection(dataset),
+    `Redacta ambos textos en ${LANGUAGE[locale]}.`,
+    DESCRIBER_ROLE,
+  ].join('\n\n');
+}
+
 export interface InstructionOptions {
   role: string;
   dataset: DatasetContext;
@@ -397,7 +450,7 @@ export function buildInstructions({
  * it names what the number actually is.
  */
 export function describeProjection(decision: VizDecision | null): string {
-  if (!decision || !decision.measure) return '';
+  if (!decision?.measure) return '';
 
   return `
 

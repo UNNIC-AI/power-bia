@@ -4,12 +4,13 @@ import { useTranslation } from 'react-i18next';
 import { ConfirmDialog } from '../../components/ConfirmDialog.tsx';
 import { DashboardCanvas } from '../../components/dashboard/DashboardCanvas.tsx';
 import { Sidebar } from '../../components/Sidebar.tsx';
-import { useDataset } from '../../lib/dataset-context.tsx';
+
 import { formatDay } from '../../lib/format.ts';
 import {
   useCreateDashboard,
   useDashboard,
   useDashboards,
+  useDataset,
   useDeleteDashboard,
   useRegenerateDashboardName,
   useRenameDashboard,
@@ -29,7 +30,7 @@ function DashboardsRoute() {
   const navigate = useNavigate();
   const { d: selectedId } = Route.useSearch();
 
-  const { active } = useDataset();
+  const dataset = useDataset();
   const dashboards = useDashboards();
   const createDashboard = useCreateDashboard();
   const renameDashboard = useRenameDashboard();
@@ -39,24 +40,20 @@ function DashboardsRoute() {
   /** Deleting is irreversible, so the row is held here until it is confirmed. */
   const [pendingDelete, setPendingDelete] = useState<{ id: string; name: string } | null>(null);
 
-  const datasetId = active?.id;
   const activeId = selectedId ?? dashboards.data?.[0]?.id;
   const dashboard = useDashboard(activeId ?? null);
 
-  if (!datasetId) return null;
+  if (!dataset.data) return null;
 
   const select = (id: string) => void navigate({ to: '/dashboards', search: { d: id } });
 
   /*
    * A view is created with a placeholder name and renamed from the row's menu,
-   * the way a new chat is titled after the fact. The alternative — a name field
-   * in the sidebar — is the one thing the two lists could not share.
+   * the way a new chat is titled after the fact. The alternative - a name field
+   * in the sidebar - is the one thing the two lists could not share.
    */
   const create = async () => {
-    const created = await createDashboard.mutateAsync({
-      name: t('dashboards.defaultName'),
-      datasetId,
-    });
+    const created = await createDashboard.mutateAsync({ name: t('dashboards.defaultName') });
     select(created.id);
   };
 

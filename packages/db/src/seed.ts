@@ -300,14 +300,16 @@ async function main() {
       name,
       description:
         'Ventas mayoristas de botellas de licor: cada factura registra botellas vendidas de un producto en una tienda en una fecha.',
-      tenantId: process.env.PBI_TENANT_ID ?? '',
-      clientId: process.env.PBI_CLIENT_ID ?? '',
-      clientSecretEncrypted: encryptSecret(
-        process.env.PBI_CLIENT_SECRET ?? '',
-        DATASET_SECRET_KEY as string,
-      ),
-      workspaceName: process.env.PBI_WORKSPACE_NAME ?? '',
-      datasetName: process.env.PBI_DATASET_NAME ?? '',
+      /*
+       * Left blank on purpose. The connection belongs to the environment: the API
+       * writes `PBI_*` into this row on every boot, so a value seeded here would
+       * be overwritten and would only invite someone to edit the wrong place.
+       */
+      tenantId: '',
+      clientId: '',
+      clientSecretEncrypted: encryptSecret('', DATASET_SECRET_KEY as string),
+      workspaceName: '',
+      datasetName: '',
       dateMin: '2012-01-01',
       dateMax: '2021-12-31',
     })

@@ -14,7 +14,6 @@ export const filterSelectionSchema = z.object({
 });
 
 export const chatRequestSchema = z.object({
-  datasetId: z.uuid(),
   conversationId: z.uuid().nullable().default(null),
   text: z.string().min(1).max(2000),
   locale: localeSchema.default('es'),
@@ -25,7 +24,6 @@ export const chatRequestSchema = z.object({
 
 /** Non-streaming path used by widget refresh and inline widget editing. */
 export const queryRequestSchema = z.object({
-  datasetId: z.uuid(),
   text: z.string().min(1).max(2000),
   locale: localeSchema.default('es'),
   filters: z.array(filterSelectionSchema).default([]),
@@ -57,7 +55,6 @@ export const messageSchema = z.object({
 export const conversationSchema = z.object({
   id: z.uuid(),
   title: z.string(),
-  datasetId: z.uuid(),
   createdAt: z.iso.datetime(),
   updatedAt: z.iso.datetime(),
 });

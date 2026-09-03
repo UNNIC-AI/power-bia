@@ -41,7 +41,7 @@ const MAX_TICK_CHARS = 16;
 
 /** An angled label longer than this runs off the left edge of the plot. */
 function truncateTick(value: string): string {
-  return value.length > MAX_TICK_CHARS ? `${value.slice(0, MAX_TICK_CHARS - 1)}…` : value;
+  return value.length > MAX_TICK_CHARS ? `${value.slice(0, MAX_TICK_CHARS - 1)}...` : value;
 }
 
 export function ChartAxes({ locale, angleLabels }: { locale: Locale; angleLabels: boolean }) {

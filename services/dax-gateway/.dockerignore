@@ -1,0 +1,5 @@
+# The host obj/ carries a project.assets.json with /nix/store NuGet paths in it.
+# `COPY . .` after `dotnet restore` would overwrite the container's restore
+# output with it, and the ADOMD package then "was not found" (NETSDK1064).
+obj/
+bin/

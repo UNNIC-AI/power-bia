@@ -1,0 +1,120 @@
+name: powerbia
+
+# Production shape. Not an overlay on docker-compose.yml: that file exists to
+# make development combinations easy, and its bind mounts, dev targets and
+# default password are exactly what must not reach a server.
+#
+#   docker compose -f docker-compose.prod.yml up -d --build
+#
+# Every secret comes from the environment. There is no `.env` default here on
+# purpose - a missing variable must stop the deploy, not silently start an
+# instance with a known password.
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?}
+      POSTGRES_DB: ${POSTGRES_DB:?}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    deploy:
+      resources:
+        limits: { memory: 1g }
+
+  dax-gateway:
+    build:
+      context: ./services/dax-gateway
+    restart: always
+    environment:
+      DAX_GATEWAY_TOKEN: ${DAX_GATEWAY_TOKEN:?}
+      ASPNETCORE_URLS: http://0.0.0.0:8080
+    # Not published. The gateway holds the Power BI service principal
+    # credentials; only the API has any business reaching it.
+    expose:
+      - "8080"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits: { memory: 1g }
+
+  # One-shot, run before the API comes up. Never on application start: replicas race.
+  migrate:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+      target: build
+    restart: "no"
+    environment:
+      DATABASE_URL: ${DATABASE_URL:?}
+    command: ["pnpm", "db:migrate"]
+    depends_on:
+      postgres: { condition: service_healthy }
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+      target: runtime
+    restart: always
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DATABASE_URL: ${DATABASE_URL:?}
+      WEB_ORIGIN: ${WEB_ORIGIN:?}
+      DAX_GATEWAY_URL: http://dax-gateway:8080
+      DAX_GATEWAY_TOKEN: ${DAX_GATEWAY_TOKEN:?}
+      DATASET_SECRET_KEY: ${DATASET_SECRET_KEY:?}
+      SESSION_COOKIE_SECRET: ${SESSION_COOKIE_SECRET:?}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:?}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-https://api.openai.com/v1}
+      LLM_MODEL: ${LLM_MODEL:-gpt-4.1}
+      MODEL_CONTEXT_LOCALE: ${MODEL_CONTEXT_LOCALE:-es}
+      INTROSPECT_ON_STARTUP: ${INTROSPECT_ON_STARTUP:-true}
+      INTROSPECT_MAX_AGE_HOURS: ${INTROSPECT_MAX_AGE_HOURS:-168}
+      PBI_TENANT_ID: ${PBI_TENANT_ID:?}
+      PBI_CLIENT_ID: ${PBI_CLIENT_ID:?}
+      PBI_CLIENT_SECRET: ${PBI_CLIENT_SECRET:?}
+      PBI_WORKSPACE_NAME: ${PBI_WORKSPACE_NAME:?}
+      PBI_DATASET_NAME: ${PBI_DATASET_NAME:?}
+      PBI_MODEL_NAME: ${PBI_MODEL_NAME:-}
+    expose:
+      - "3000"
+    depends_on:
+      postgres: { condition: service_healthy }
+      migrate: { condition: service_completed_successfully }
+    deploy:
+      resources:
+        limits: { memory: 1g }
+
+  # The only published service: nginx serves the built SPA and proxies /api,
+  # which is what keeps the session cookie same-origin and SameSite=Strict.
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      target: runtime
+    restart: always
+    environment:
+      API_URL: http://api:3000
+    ports:
+      - "${WEB_PORT:-8080}:8080"
+    depends_on:
+      - api
+    deploy:
+      resources:
+        limits: { memory: 256m }
+
+volumes:
+  pgdata:

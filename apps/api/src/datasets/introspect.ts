@@ -22,7 +22,7 @@ import { probeDateRange, probeSampleValues } from './probes.js';
  * The invariant that governs every write here: `note` and `labels` on
  * `dataset_columns`, and every row in `dataset_synonyms`, are curated by hand and
  * are what make the generated DAX correct. Introspection may never overwrite
- * them — see docs/data-model.md.
+ * them - see docs/data-model.md.
  */
 
 interface Counts {
@@ -41,11 +41,15 @@ export interface IntrospectOptions {
   datasetId: string;
 }
 
+/**
+ * `contextGenerated` is the caller's to fill in - see ./sync.ts. Introspection
+ * knows nothing about the LLM that documents what it discovered.
+ */
 export async function introspectDataset({
   db,
   executor,
   datasetId,
-}: IntrospectOptions): Promise<IntrospectionReport> {
+}: IntrospectOptions): Promise<Omit<IntrospectionReport, 'contextGenerated'>> {
   const startedAt = Date.now();
 
   const dataset = await db.query.datasets.findFirst({
@@ -308,7 +312,7 @@ async function write({
       .from(schema.datasetRelationships)
       .where(eq(schema.datasetRelationships.datasetId, datasetId));
 
-    const key = (from: string, to: string) => `${from}→${to}`;
+    const key = (from: string, to: string) => `${from}->${to}`;
     const existingByKey = new Map(
       existingRelationships.map((row) => [key(row.fromColumn, row.toColumn), row]),
     );
@@ -367,19 +371,14 @@ async function write({
 }
 
 /**
- * Datasets whose catalogue is missing or older than `maxAgeHours`. Used by the
- * startup check, which refreshes them in the background.
+ * Whether a catalogue is missing or older than `maxAgeHours`. Used by the
+ * startup check, which refreshes the active model in the background.
  */
-export async function findStaleDatasets(
-  db: Database,
+export function isCatalogueStale(
+  dataset: { lastIntrospectedAt: Date | null },
   maxAgeHours: number,
-): Promise<{ id: string; name: string }[]> {
-  const datasets = await db.query.datasets.findMany();
-  const cutoff = Date.now() - maxAgeHours * 60 * 60 * 1000;
+): boolean {
+  if (!dataset.lastIntrospectedAt) return true;
 
-  return datasets
-    .filter(
-      (dataset) => !dataset.lastIntrospectedAt || dataset.lastIntrospectedAt.getTime() < cutoff,
-    )
-    .map((dataset) => ({ id: dataset.id, name: dataset.name }));
+  return dataset.lastIntrospectedAt.getTime() < Date.now() - maxAgeHours * 60 * 60 * 1000;
 }

@@ -16,6 +16,7 @@ import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { requireUser } from '../app.js';
 import { appendMessage, ensureConversation, loadHistory } from '../conversations/store.js';
 import { loadConnection, loadDatasetContext } from '../datasets/context.js';
+import { findActiveDataset } from '../datasets/provision.js';
 import { retitleConversation } from '../pipeline/retitle.js';
 import { runPipeline } from '../pipeline/run.js';
 
@@ -40,13 +41,18 @@ export async function chatRoutes(app: FastifyInstance) {
 
   route.post('/chat', { schema: { body: chatRequestSchema } }, async (request, reply) => {
     const user = requireUser(request);
-    const { datasetId, conversationId, text, locale, filters, forcedChartType } = request.body;
+    const { conversationId, text, locale, filters, forcedChartType } = request.body;
+
+    // The model is the environment's, never the caller's: no id crosses the wire.
+    const active = await findActiveDataset(app.db);
+    if (!active) return reply.code(404).send({ message: 'No model configured' });
+    const datasetId = active.id;
 
     const [dataset, connection] = await Promise.all([
       loadDatasetContext(app.db, datasetId),
       loadConnection(app.db, datasetId),
     ]);
-    if (!dataset || !connection) return reply.code(404).send({ message: 'Dataset not found' });
+    if (!dataset || !connection) return reply.code(404).send({ message: 'No model configured' });
 
     const { conversation, created } = await ensureConversation({
       db: app.db,
@@ -77,7 +83,7 @@ export async function chatRoutes(app: FastifyInstance) {
        * readable the instant the client sees the stream close: an async
        * `execute` holds the stream open until it settles. Persisting afterwards
        * raced the refetch the client fires on finish, which could then store a
-       * conversation whose answer was still missing — the same "only appears
+       * conversation whose answer was still missing - the same "only appears
        * after a refresh" symptom, one navigation later.
        *
        * The await does not stall the prose: `merge` is already draining the
@@ -147,13 +153,16 @@ export async function chatRoutes(app: FastifyInstance) {
     },
     async (request, reply) => {
       requireUser(request);
-      const { datasetId, text, locale, filters, forcedChartType } = request.body;
+      const { text, locale, filters, forcedChartType } = request.body;
+
+      const active = await findActiveDataset(app.db);
+      if (!active) return reply.code(404).send({ message: 'No model configured' });
 
       const [dataset, connection] = await Promise.all([
-        loadDatasetContext(app.db, datasetId),
-        loadConnection(app.db, datasetId),
+        loadDatasetContext(app.db, active.id),
+        loadConnection(app.db, active.id),
       ]);
-      if (!dataset || !connection) return reply.code(404).send({ message: 'Dataset not found' });
+      if (!dataset || !connection) return reply.code(404).send({ message: 'No model configured' });
 
       const outcome = await runPipeline({
         text,

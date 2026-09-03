@@ -24,14 +24,14 @@ export function ConfirmDialog({ open, title, body, confirmLabel, onConfirm, onCa
   return (
     <AlertDialog.Root open={open} onOpenChange={(next) => !next && onCancel()}>
       <AlertDialog.Portal>
-        <AlertDialog.Overlay className="fixed inset-0 z-40 bg-black/40" />
+        <AlertDialog.Overlay className="fixed inset-0 z-60 bg-black/40" />
         {/*
          * Styled from tokens rather than with DaisyUI's `modal-box`: that class
          * is transparent and scaled down until an enclosing `.modal` opens it,
          * so on a Radix content element it rendered a perfectly invisible
-         * dialog — present in the accessibility tree, absent on screen.
+         * dialog - present in the accessibility tree, absent on screen.
          */}
-        <AlertDialog.Content className="bg-base-100 border-base-300 rounded-box fixed top-1/2 left-1/2 z-50 w-[calc(100%-2rem)] max-w-sm -translate-x-1/2 -translate-y-1/2 border p-6 shadow-xl">
+        <AlertDialog.Content className="bg-base-100 border-base-300 rounded-box fixed top-1/2 left-1/2 z-70 w-[calc(100%-2rem)] max-w-sm -translate-x-1/2 -translate-y-1/2 border p-6 shadow-xl">
           <AlertDialog.Title className="text-base font-semibold">{title}</AlertDialog.Title>
           <AlertDialog.Description className="text-base-content/70 mt-2 text-sm">
             {body}

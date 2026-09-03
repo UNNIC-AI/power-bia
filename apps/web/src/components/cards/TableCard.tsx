@@ -1,11 +1,20 @@
 import type { Locale, TableCard as TableCardType } from '@powerbia/contracts';
-import { IconChevronLeft, IconChevronRight } from '@tabler/icons-react';
+import { IconCheck, IconChevronLeft, IconChevronRight, IconMinus } from '@tabler/icons-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { formatCell } from '../../lib/format.ts';
 import { Tooltip } from '../Tooltip.tsx';
 
 const PAGE_SIZE = 25;
+
+/** A boolean result cell. An icon, never a glyph in a string - see `formatCell`. */
+function BooleanCell({ value, label }: { value: boolean; label: string }) {
+  return value ? (
+    <IconCheck size={16} stroke={2} aria-label={label} />
+  ) : (
+    <IconMinus size={16} stroke={2} className="text-base-content/40" aria-label={label} />
+  );
+}
 
 export function TableCard({ card, locale }: { card: TableCardType; locale: Locale }) {
   const { t } = useTranslation();
@@ -39,7 +48,11 @@ export function TableCard({ card, locale }: { card: TableCardType; locale: Local
                     key={card.columns[cellIndex] ?? cellIndex}
                     className={typeof cell === 'number' ? 'text-right tabular-nums' : ''}
                   >
-                    {formatCell(cell, locale)}
+                    {typeof cell === 'boolean' ? (
+                      <BooleanCell value={cell} label={t(cell ? 'table.yes' : 'table.no')} />
+                    ) : (
+                      formatCell(cell, locale)
+                    )}
                   </td>
                 ))}
               </tr>

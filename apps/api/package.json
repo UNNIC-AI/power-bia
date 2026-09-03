@@ -4,12 +4,12 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "tsx watch src/index.ts",
+    "dev": "tsx watch --env-file-if-exists=../../.env src/index.ts",
     "start": "node dist/index.js",
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
-    "demo": "tsx src/demo-seed.ts"
+    "demo": "tsx --env-file-if-exists=../../.env src/demo-seed.ts"
   },
   "dependencies": {
     "@ai-sdk/openai": "catalog:",
@@ -17,9 +17,13 @@
     "@fastify/cors": "catalog:",
     "@fastify/helmet": "catalog:",
     "@fastify/rate-limit": "catalog:",
+    "@fastify/sensible": "catalog:",
+    "@fastify/swagger": "catalog:",
+    "@fastify/under-pressure": "catalog:",
     "@powerbia/contracts": "workspace:*",
     "@powerbia/db": "workspace:*",
     "ai": "catalog:",
+    "close-with-grace": "catalog:",
     "drizzle-orm": "catalog:",
     "fastify": "catalog:",
     "fastify-plugin": "catalog:",
@@ -30,6 +34,7 @@
   "devDependencies": {
     "@types/node": "catalog:",
     "pino-pretty": "catalog:",
+    "postgres": "catalog:",
     "tsx": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"

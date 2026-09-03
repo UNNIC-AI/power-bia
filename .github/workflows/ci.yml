@@ -9,10 +9,33 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  # The database-backed suites refuse to skip when CI is set. See
+  # apps/api/src/test/database.ts.
+  CI: "true"
+
 jobs:
   node:
-    name: lint · typecheck · test · build
+    name: lint / typecheck / test / build
     runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: powerbia
+          POSTGRES_PASSWORD: powerbia
+          POSTGRES_DB: powerbia
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U powerbia -d powerbia"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgres://powerbia:powerbia@localhost:5432/powerbia
+
     steps:
       - uses: actions/checkout@v5
 
@@ -22,15 +45,61 @@ jobs:
 
       - uses: actions/setup-node@v5
         with:
-          node-version: 24
+          node-version-file: .nvmrc
           cache: pnpm
 
       - run: pnpm install --frozen-lockfile
 
       - run: pnpm lint
       - run: pnpm typecheck
+
+      # Against an empty database, which is the only way a migration that only
+      # works on a developer's machine is caught.
+      - name: Apply migrations to an empty database
+        run: pnpm db:migrate
+
       - run: pnpm test
       - run: pnpm build
+
+      - name: Audit dependencies
+        run: pnpm audit --audit-level high
+        continue-on-error: true
+
+  images:
+    name: docker images
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build the API image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/api/Dockerfile
+          target: runtime
+          push: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build the web image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/web/Dockerfile
+          target: runtime
+          push: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build the gateway image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./services/dax-gateway
+          push: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
   gateway:
     name: dax-gateway
@@ -47,3 +116,15 @@ jobs:
 
       - run: dotnet test --configuration Release
         working-directory: services/dax-gateway
+
+  nix:
+    name: nix flake check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: cachix/install-nix-action@v31
+        with:
+          extra_nix_config: "experimental-features = nix-command flakes"
+
+      - run: nix flake check --print-build-logs

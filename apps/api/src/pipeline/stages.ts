@@ -4,6 +4,8 @@ import {
   type DaxGeneration,
   type FilterColumn,
   filterColumnSchema,
+  type GeneratedDatasetContext,
+  generatedDatasetContextSchema,
   type Intent,
   intentSchema,
   type Locale,
@@ -15,6 +17,7 @@ import { z } from 'zod';
 import { cleanGeneratedDax } from '../dax/sanitize.js';
 import { env } from '../env.js';
 import {
+  buildDescriberInstructions,
   buildInstructions,
   CONVERSATION_ROLE,
   describeProjection,
@@ -134,7 +137,7 @@ function toDaxGeneration(
       outcome: 'out_of_range',
       requestedPeriod: output.requestedPeriod ?? '',
       availableRange:
-        output.availableRange ?? `${dataset.dateRange.min} — ${dataset.dateRange.max}`,
+        output.availableRange ?? `${dataset.dateRange.min} - ${dataset.dateRange.max}`,
     };
   }
 
@@ -331,4 +334,47 @@ export async function generateTitle(options: {
   // The length rule is in the prompt, but a title is stored and shown either
   // way, so it is enforced here rather than trusted.
   return output.title.trim().slice(0, TITLE_LIMIT);
+}
+
+/** Contract caps, enforced here because the model is asked, not trusted. */
+const DESCRIPTION_LIMIT = 1_000;
+const EXTRA_CONTEXT_LIMIT = 8_000;
+
+/**
+ * Documents a model from its own catalogue: what it measures, what its cryptic
+ * column names mean, which columns must not be summed.
+ *
+ * It runs once when a model is first connected and again whenever an admin asks
+ * for it, so nobody has to write the fourth prompt layer from a blank textarea.
+ * The previous text is handed over rather than discarded - after a re-sync most
+ * of what a person added is still true, and only the parts about columns that
+ * changed need rewriting.
+ */
+export async function describeModel(options: {
+  dataset: DatasetContext;
+  locale: Locale;
+}): Promise<GeneratedDatasetContext> {
+  const { dataset, locale } = options;
+
+  const previous = dataset.extraContext.trim();
+
+  const { output } = await generateText({
+    model,
+    ...DETERMINISTIC,
+    instructions: buildDescriberInstructions({ dataset, locale }),
+    prompt: previous
+      ? `Versión anterior de "extraContext", escrita para este mismo modelo (revísala y
+actualízala; conserva lo que siga siendo cierto):
+
+${previous}
+
+Documenta el modelo.`
+      : 'Documenta el modelo. No hay versión anterior.',
+    output: Output.object({ schema: generatedDatasetContextSchema }),
+  });
+
+  return {
+    description: output.description.trim().slice(0, DESCRIPTION_LIMIT),
+    extraContext: output.extraContext.trim().slice(0, EXTRA_CONTEXT_LIMIT),
+  };
 }

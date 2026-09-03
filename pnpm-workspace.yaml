@@ -6,10 +6,13 @@ packages:
 # postinstall to link the platform binary that vitest and vite run through.
 allowBuilds:
   esbuild: true
+  # msw's postinstall only copies the browser service worker into a public
+  # directory. The tests use msw/node, so there is nothing for it to do.
+  msw: false
 
 # Single source of truth for third-party versions. Workspace packages depend on
 # `catalog:` rather than a range, so a bump happens here once and cannot drift
-# between apps/api and apps/web — which matters most for zod and the AI SDK,
+# between apps/api and apps/web - which matters most for zod and the AI SDK,
 # where two copies at different majors break type inference in confusing ways.
 catalog:
   # --- AI ---------------------------------------------------------------
@@ -28,7 +31,10 @@ catalog:
   "@fastify/cors": ^11.3.0
   "@fastify/helmet": ^13.1.0
   "@fastify/rate-limit": ^11.2.0
+  "@fastify/sensible": ^6.0.3
+  "@fastify/under-pressure": ^9.0.3
   "@fastify/swagger": ^9.8.1
+  close-with-grace: ^2.2.0
   pino: ^10.3.1
   pino-pretty: ^13.1.3
 
@@ -53,10 +59,7 @@ catalog:
   tailwindcss: ^4.3.3
   "@tailwindcss/vite": ^4.3.3
   daisyui: ^5.7.16
-  # DaisyUI ships the styling for this one under `.react-day-picker`, range and
-  # caption dropdowns included, so the library's own stylesheet is not imported.
-  "react-day-picker": ^10.0.1
-  # Import from the package root, not `dist/esm/icons/IconX.mjs` — the per-icon
+  # Import from the package root, not `dist/esm/icons/IconX.mjs` - the per-icon
   # files ship no `.d.ts`, so deep imports are untyped. The barrel is safe: the
   # package is ESM with `sideEffects: false`, so Rollup drops the ~5.9k unused
   # icons from the bundle. Only the dev-server prebundle pays for the full set.
@@ -73,6 +76,11 @@ catalog:
   "@biomejs/biome": ^2.5.8
   turbo: ^2.10.9
   vitest: ^4.1.10
+  "@testing-library/react": ^16.3.0
+  "@testing-library/user-event": ^14.6.1
+  "@testing-library/jest-dom": ^6.6.3
+  jsdom: ^26.1.0
+  msw: ^2.7.3
   tsx: ^4.23.12
   "@types/node": ^26.2.0
   "@types/react": ^19.2.18

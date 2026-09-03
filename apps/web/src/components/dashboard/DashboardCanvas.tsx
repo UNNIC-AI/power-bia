@@ -296,7 +296,6 @@ export function DashboardCanvas({ dashboard, locale }: Props) {
       markBusy(widget.id, true);
       try {
         const result = await runQuery.mutateAsync({
-          datasetId: dashboard.datasetId,
           text,
           locale,
           filters,
@@ -315,7 +314,7 @@ export function DashboardCanvas({ dashboard, locale }: Props) {
         markBusy(widget.id, false);
       }
     },
-    [dashboard.datasetId, locale, markBusy, runQuery, updateWidget],
+    [locale, markBusy, runQuery, updateWidget],
   );
 
   /** A slicer change re-executes every other widget with the new filter context. */
@@ -337,7 +336,6 @@ export function DashboardCanvas({ dashboard, locale }: Props) {
 
   const ask = async (text: string) => {
     const result = await runQuery.mutateAsync({
-      datasetId: dashboard.datasetId,
       text,
       locale,
       filters: activeFilters,
@@ -348,7 +346,7 @@ export function DashboardCanvas({ dashboard, locale }: Props) {
       kind: 'note',
       title: text,
       subtitle: null,
-      text: result.text || '—',
+      text: result.text || '-',
     };
     const size = DEFAULT_WIDGET_SIZE[card.kind];
     const nextY = widgets.reduce(
@@ -394,7 +392,7 @@ export function DashboardCanvas({ dashboard, locale }: Props) {
                       .then(scheduleFilterRun);
                   }}
                 >
-                  {filter.title}: {filter.selected.length} ×
+                  {filter.title}: {filter.selected.length} x
                 </button>
               );
             })}

@@ -16,7 +16,7 @@ Drizzle schema in `packages/db/src/schema.ts`; generated SQL in
 
 | Table | Notes |
 |---|---|
-| `datasets` | One Power BI connection. Structured `tenant_id` / `client_id` / `workspace_name` / `dataset_name`, plus `client_secret_encrypted`. `date_min` / `date_max` drive the pipeline's temporal awareness. **`extra_context`** is admin-written prose injected into every prompt |
+| `datasets` | One Power BI connection, a projection of `PBI_*` rewritten on every boot. Structured `tenant_id` / `client_id` / `workspace_name` / `dataset_name`, plus `client_secret_encrypted`. `date_min` / `date_max` are probed from the model and drive the pipeline's temporal awareness. **`extra_context`** is prose injected into every prompt — written by the LLM from the catalogue, then curated by an admin; `extra_context_generated_at` says when the LLM last wrote it, and is null once a person saves their own text |
 | `dataset_tables` | name, role (`fact` / `dimension` / `date`), description |
 | `dataset_columns` | name, type, sample value, `is_aggregatable`, **`note`**, **`labels`** |
 | `dataset_measures` | business vocabulary → DAX expression, plus `source` (`curated` / `introspected`) |
@@ -46,6 +46,24 @@ by table because the curated surface does:
 | `dataset_measures` | Only `source = 'introspected'` rows are written or deleted. A `curated` row wins over a model measure of the same name |
 | `dataset_relationships` | Replaced wholesale — nothing curated lives here, and there is no unique index to key an upsert on |
 | `dataset_synonyms` | Never touched. 100% curated |
+
+### Indexes
+
+Every foreign key is indexed. Postgres does not do it for you, and an unindexed
+one turns a cascading delete into a sequential scan.
+
+Most are covered by an index that exists for another reason — the unique
+`(dataset_id, name)` and `(table_id, name)` pairs above, `sessions_user_idx`,
+`messages_conversation_idx`, `widgets_dashboard_idx`. Two needed one of their own:
+
+| Index | Why |
+|---|---|
+| `dataset_relationships_dataset_idx` | The only catalogue table with no unique index, and repointing the environment deletes every row by `dataset_id` |
+| `dax_query_log_user_idx` | Deleting an account nulls this column across the whole log |
+
+`conversations.dataset_id` and `dashboards.dataset_id` are deliberately left
+unindexed: there is exactly one dataset row, so the column has one value, and both
+tables are already indexed by the user who owns them.
 
 `extra_context` is the escape hatch for everything the heuristics cannot infer.
 Unlike `note`, it is per dataset rather than per column, and it reaches **every**
@@ -121,8 +139,8 @@ first.
 `packages/db/src/seed.ts` is the port of the MVP's `schema.py`: 4 tables, 45
 columns with their curated notes and labels, 7 measures, 3 relationships, 17
 synonyms. It is idempotent — it exits if a dataset with that name already exists.
-It reads the `PBI_*` variables for the connection fields, so seeding without them
-produces correct metadata but a connection that cannot authenticate.
+It leaves the connection fields blank on purpose: the API writes `PBI_*` into that
+row on its next boot, and a value seeded here would only be overwritten.
 
 ## Gotchas
 

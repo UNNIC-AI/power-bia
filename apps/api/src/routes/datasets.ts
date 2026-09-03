@@ -1,193 +1,165 @@
 import {
   type DatasetSummary,
-  datasetConnectionInputSchema,
   datasetContextSchema,
   datasetSettingsInputSchema,
   datasetSummarySchema,
   errorSchema,
   introspectionReportSchema,
+  localeSchema,
 } from '@powerbia/contracts';
-import { encryptSecret, schema } from '@powerbia/db';
+import { schema } from '@powerbia/db';
 import { eq } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { requireAdmin, requireUser } from '../app.js';
 import { loadDatasetContext } from '../datasets/context.js';
-import { introspectDataset } from '../datasets/introspect.js';
-import { env } from '../env.js';
+import { findActiveDataset } from '../datasets/provision.js';
+import { generateDatasetContext, syncDataset } from '../datasets/sync.js';
 
-const paramsSchema = z.object({ id: z.uuid() });
+const localeBody = z.object({ locale: localeSchema.optional() }).optional();
 
 type DatasetRow = typeof schema.datasets.$inferSelect;
 
-async function toSummary(app: FastifyInstance, dataset: DatasetRow): Promise<DatasetSummary> {
-  const [tables, measures] = await Promise.all([
-    app.db
-      .select({ id: schema.datasetTables.id })
-      .from(schema.datasetTables)
-      .where(eq(schema.datasetTables.datasetId, dataset.id)),
-    app.db
-      .select({ id: schema.datasetMeasures.id })
-      .from(schema.datasetMeasures)
-      .where(eq(schema.datasetMeasures.datasetId, dataset.id)),
-  ]);
-
+function toSummary(
+  dataset: DatasetRow,
+  counts: { tables: number; measures: number },
+): DatasetSummary {
   return {
     id: dataset.id,
     name: dataset.name,
     description: dataset.description,
     extraContext: dataset.extraContext,
+    extraContextGeneratedAt: dataset.extraContextGeneratedAt?.toISOString() ?? null,
+    source: { workspaceName: dataset.workspaceName, datasetName: dataset.datasetName },
     dateRange: { min: dataset.dateMin, max: dataset.dateMax },
-    tableCount: tables.length,
-    measureCount: measures.length,
+    tableCount: counts.tables,
+    measureCount: counts.measures,
     lastIntrospectedAt: dataset.lastIntrospectedAt?.toISOString() ?? null,
   };
 }
 
+async function loadSummary(
+  app: FastifyInstance,
+  datasetId: string,
+): Promise<DatasetSummary | null> {
+  const dataset = await app.db.query.datasets.findFirst({
+    where: eq(schema.datasets.id, datasetId),
+    with: { tables: true, measures: true },
+  });
+  if (!dataset) return null;
+
+  return toSummary(dataset, {
+    tables: dataset.tables.length,
+    measures: dataset.measures.length,
+  });
+}
+
+/**
+ * The model, singular.
+ *
+ * There is no id in any of these paths and no route to create, connect, list or
+ * delete a dataset. The Power BI source comes from `PBI_*` in the environment
+ * and is written into the row on boot by `provisionDatasetFromEnv`; the server
+ * resolves which row that is, so a client cannot ask for a different one. What
+ * is left here is the curated layer, plus the two actions that re-read the model.
+ */
 export async function datasetRoutes(app: FastifyInstance) {
   const route = app.withTypeProvider<ZodTypeProvider>();
 
   route.get(
     '/',
-    { schema: { response: { 200: z.array(datasetSummarySchema) } } },
-    async (request) => {
+    { schema: { response: { 200: datasetSummarySchema, 404: errorSchema } } },
+    async (request, reply) => {
       requireUser(request);
 
-      const datasets = await app.db.query.datasets.findMany({
-        with: { tables: true, measures: true },
-      });
+      const dataset = await findActiveDataset(app.db);
+      if (!dataset) return reply.code(404).send({ message: 'No model configured' });
 
-      return datasets.map((dataset) => ({
-        id: dataset.id,
-        name: dataset.name,
-        description: dataset.description,
-        extraContext: dataset.extraContext,
-        dateRange: { min: dataset.dateMin, max: dataset.dateMax },
-        tableCount: dataset.tables.length,
-        measureCount: dataset.measures.length,
-        lastIntrospectedAt: dataset.lastIntrospectedAt?.toISOString() ?? null,
-      }));
+      const summary = await loadSummary(app, dataset.id);
+      if (!summary) return reply.code(404).send({ message: 'No model configured' });
+
+      return summary;
     },
   );
 
   route.get(
-    '/:id/context',
-    { schema: { params: paramsSchema, response: { 200: datasetContextSchema, 404: errorSchema } } },
+    '/context',
+    { schema: { response: { 200: datasetContextSchema, 404: errorSchema } } },
     async (request, reply) => {
       requireUser(request);
 
-      const context = await loadDatasetContext(app.db, request.params.id);
-      if (!context) return reply.code(404).send({ message: 'Dataset not found' });
+      const dataset = await findActiveDataset(app.db);
+      if (!dataset) return reply.code(404).send({ message: 'No model configured' });
+
+      const context = await loadDatasetContext(app.db, dataset.id);
+      if (!context) return reply.code(404).send({ message: 'No model configured' });
 
       return context;
     },
   );
 
-  /**
-   * Registers a Power BI connection and discovers its model straight away, so a
-   * new source is usable without touching the seed script.
-   */
-  route.post(
+  /** The curated layer an admin can edit: prose about the model. */
+  route.patch(
     '/',
     {
       schema: {
-        body: datasetConnectionInputSchema,
-        response: { 201: datasetSummarySchema, 422: errorSchema },
-      },
-    },
-    async (request, reply) => {
-      requireAdmin(request);
-      const input = request.body;
-
-      /*
-       * A placeholder range, immediately overwritten by the introspection below.
-       * When that fails the dataset still exists with credentials the admin can
-       * fix and re-sync, and the range is editable in Settings — losing the row
-       * would mean typing the whole connection again.
-       */
-      const today = new Date().toISOString().slice(0, 10);
-
-      const [dataset] = await app.db
-        .insert(schema.datasets)
-        .values({
-          name: input.name,
-          tenantId: input.tenantId,
-          clientId: input.clientId,
-          clientSecretEncrypted: encryptSecret(input.clientSecret, env.DATASET_SECRET_KEY),
-          workspaceName: input.workspaceName,
-          datasetName: input.datasetName,
-          dateMin: today,
-          dateMax: today,
-        })
-        .returning();
-      if (!dataset) return reply.code(422).send({ message: 'Could not create dataset' });
-
-      try {
-        await introspectDataset({ db: app.db, executor: app.executor, datasetId: dataset.id });
-      } catch (cause) {
-        app.log.error({ cause, dataset: dataset.name }, 'introspection after create failed');
-      }
-
-      const fresh = await app.db.query.datasets.findFirst({
-        where: eq(schema.datasets.id, dataset.id),
-      });
-
-      return reply.code(201).send(await toSummary(app, fresh ?? dataset));
-    },
-  );
-
-  /** The curated layer an admin can edit: prose about the model and its date range. */
-  route.patch(
-    '/:id',
-    {
-      schema: {
-        params: paramsSchema,
         body: datasetSettingsInputSchema,
         response: { 200: datasetSummarySchema, 404: errorSchema },
       },
     },
     async (request, reply) => {
       requireAdmin(request);
-      const { description, extraContext, dateRange } = request.body;
+      const { description, extraContext } = request.body;
+
+      const active = await findActiveDataset(app.db);
+      if (!active) return reply.code(404).send({ message: 'No model configured' });
 
       const [dataset] = await app.db
         .update(schema.datasets)
         .set({
           ...(description === undefined ? {} : { description }),
-          ...(extraContext === undefined ? {} : { extraContext }),
-          ...(dateRange === undefined ? {} : { dateMin: dateRange.min, dateMax: dateRange.max }),
+          /*
+           * Saved prose is the admin's, so the "written by the assistant" stamp
+           * is dropped: the dialog must never label a person's words as
+           * generated, and the sync only auto-writes an empty field anyway.
+           */
+          ...(extraContext === undefined ? {} : { extraContext, extraContextGeneratedAt: null }),
         })
-        .where(eq(schema.datasets.id, request.params.id))
+        .where(eq(schema.datasets.id, active.id))
         .returning();
 
-      if (!dataset) return reply.code(404).send({ message: 'Dataset not found' });
+      if (!dataset) return reply.code(404).send({ message: 'No model configured' });
 
-      return toSummary(app, dataset);
+      const summary = await loadSummary(app, dataset.id);
+      if (!summary) return reply.code(404).send({ message: 'No model configured' });
+
+      return summary;
     },
   );
 
+  /** Re-reads the model from Power BI. Also writes its context if it has none. */
   route.post(
-    '/:id/introspect',
+    '/introspect',
     {
       schema: {
-        params: paramsSchema,
+        body: localeBody,
         response: { 200: introspectionReportSchema, 404: errorSchema, 422: errorSchema },
       },
     },
     async (request, reply) => {
       requireAdmin(request);
 
-      const dataset = await app.db.query.datasets.findFirst({
-        where: eq(schema.datasets.id, request.params.id),
-      });
-      if (!dataset) return reply.code(404).send({ message: 'Dataset not found' });
+      const dataset = await findActiveDataset(app.db);
+      if (!dataset) return reply.code(404).send({ message: 'No model configured' });
 
       try {
-        return await introspectDataset({
+        return await syncDataset({
           db: app.db,
           executor: app.executor,
           datasetId: dataset.id,
+          locale: request.body?.locale,
+          log: app.log,
         });
       } catch (cause) {
         /*
@@ -203,11 +175,44 @@ export async function datasetRoutes(app: FastifyInstance) {
     },
   );
 
-  route.delete('/:id', { schema: { params: paramsSchema } }, async (request) => {
-    requireAdmin(request);
+  /**
+   * Rewrites the model's context from the catalogue, replacing what is there.
+   * The admin asks for this after the model changed, or when the draft they are
+   * editing has drifted too far from the model to be worth fixing by hand.
+   */
+  route.post(
+    '/context',
+    {
+      schema: {
+        body: localeBody,
+        response: { 200: datasetSummarySchema, 404: errorSchema, 422: errorSchema },
+      },
+    },
+    async (request, reply) => {
+      requireAdmin(request);
 
-    await app.db.delete(schema.datasets).where(eq(schema.datasets.id, request.params.id));
+      const active = await findActiveDataset(app.db);
+      if (!active) return reply.code(404).send({ message: 'No model configured' });
 
-    return { ok: true };
-  });
+      try {
+        await generateDatasetContext({
+          db: app.db,
+          datasetId: active.id,
+          locale: request.body?.locale,
+        });
+      } catch (cause) {
+        const message = cause instanceof Error ? cause.message : String(cause);
+        if (message === 'Dataset not found') return reply.code(404).send({ message });
+
+        app.log.error({ cause, datasetId: active.id }, 'context generation failed');
+
+        return reply.code(422).send({ message });
+      }
+
+      const summary = await loadSummary(app, active.id);
+      if (!summary) return reply.code(404).send({ message: 'No model configured' });
+
+      return summary;
+    },
+  );
 }

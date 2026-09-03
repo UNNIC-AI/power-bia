@@ -8,7 +8,7 @@
     "build": "tsc -p tsconfig.json --noEmit && vite build",
     "preview": "vite preview",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "vitest run --passWithNoTests"
+    "test": "vitest run"
   },
   "dependencies": {
     "@ai-sdk/react": "catalog:",
@@ -20,7 +20,6 @@
     "i18next": "catalog:",
     "radix-ui": "catalog:",
     "react": "catalog:",
-    "react-day-picker": "catalog:",
     "react-dom": "catalog:",
     "react-grid-layout": "catalog:",
     "react-i18next": "catalog:",
@@ -30,10 +29,15 @@
   "devDependencies": {
     "@tailwindcss/vite": "catalog:",
     "@tanstack/router-plugin": "catalog:",
+    "@testing-library/jest-dom": "catalog:",
+    "@testing-library/react": "catalog:",
+    "@testing-library/user-event": "catalog:",
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
     "@vitejs/plugin-react": "catalog:",
     "daisyui": "catalog:",
+    "jsdom": "catalog:",
+    "msw": "catalog:",
     "tailwindcss": "catalog:",
     "typescript": "catalog:",
     "vite": "catalog:",

@@ -20,8 +20,7 @@
     "generate": "drizzle-kit generate",
     "migrate": "drizzle-kit migrate",
     "studio": "drizzle-kit studio",
-    "seed": "tsx src/seed.ts",
-    "connection": "tsx src/set-connection.ts"
+    "seed": "tsx src/seed.ts"
   },
   "dependencies": {
     "@powerbia/contracts": "workspace:*",

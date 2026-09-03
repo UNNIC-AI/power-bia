@@ -23,10 +23,13 @@ export function formatCompact(value: number, locale: Locale): string {
   }).format(value);
 }
 
-export function formatCell(value: string | number | boolean | null, locale: Locale): string {
+/**
+ * Text for one result cell. Booleans are deliberately absent: they render as a
+ * Tabler icon, which is a node, not a string. See `TableCard`.
+ */
+export function formatCell(value: string | number | null, locale: Locale): string {
   if (value === null) return '';
   if (typeof value === 'number') return formatNumber(value, locale);
-  if (typeof value === 'boolean') return value ? '✓' : '—';
 
   return value;
 }

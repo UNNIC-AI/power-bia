@@ -33,7 +33,7 @@ interface Props {
  * One list for both screens: chats and views differ only in what a row means.
  *
  * The row is a flex line with two siblings, the label button and the menu
- * trigger. It used to be a button nested inside a button — invalid HTML, and the
+ * trigger. It used to be a button nested inside a button - invalid HTML, and the
  * browser resolved the click to the outer one, so the trash icon selected the row
  * it was meant to delete.
  */

@@ -13,7 +13,11 @@ export type DaxOutcome = { ok: true; result: DaxResult } | { ok: false; error: s
 
 export interface DaxExecutor {
   execute(connection: PowerBiConnection, dax: string): Promise<DaxOutcome>;
+  /** Whether the gateway answers at all. Read by `/readyz`; never throws. */
+  health(): Promise<boolean>;
 }
+
+const HEALTH_TIMEOUT_MS = 2_000;
 
 const DEFAULT_TIMEOUT_MS = 120_000;
 
@@ -53,6 +57,18 @@ export function createGatewayExecutor(baseUrl: string, token: string): DaxExecut
         };
       } catch (cause) {
         return { ok: false, error: toMessage(cause) };
+      }
+    },
+
+    async health() {
+      try {
+        const response = await fetch(new URL('/health', baseUrl), {
+          signal: AbortSignal.timeout(HEALTH_TIMEOUT_MS),
+        });
+
+        return response.ok;
+      } catch {
+        return false;
       }
     },
   };

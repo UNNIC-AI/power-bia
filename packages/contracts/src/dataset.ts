@@ -47,7 +47,7 @@ export const datasetContextSchema = z.object({
   id: z.uuid(),
   name: z.string(),
   description: z.string(),
-  /** Admin-written prose about the model, injected into every prompt stage. */
+  /** Prose about the model - written by the LLM, curated by an admin - injected into every prompt stage. */
   extraContext: z.string(),
   dateRange: z.object({ min: z.iso.date(), max: z.iso.date() }),
   tables: z.array(datasetTableSchema),
@@ -56,27 +56,34 @@ export const datasetContextSchema = z.object({
   synonyms: z.array(datasetSynonymSchema),
 });
 
+/**
+ * Which Power BI model this deployment is pointed at. Read-only: it comes from
+ * the environment, and is exposed so an admin can tell which source they are
+ * looking at without shell access to the server.
+ */
+export const datasetSourceSchema = z.object({
+  workspaceName: z.string(),
+  datasetName: z.string(),
+});
+
 export const datasetSummarySchema = z.object({
   id: z.uuid(),
   name: z.string(),
   description: z.string(),
   extraContext: z.string(),
+  /** When the model last wrote `extraContext` itself; null once an admin edits it. */
+  extraContextGeneratedAt: z.iso.datetime().nullable(),
+  source: datasetSourceSchema,
   dateRange: z.object({ min: z.iso.date(), max: z.iso.date() }),
   tableCount: z.number().int(),
   measureCount: z.number().int(),
   lastIntrospectedAt: z.iso.datetime().nullable(),
 });
 
-export const datasetConnectionInputSchema = z.object({
-  name: z.string().min(1),
-  tenantId: z.uuid(),
-  clientId: z.uuid(),
-  clientSecret: z.string().min(1),
-  workspaceName: z.string().min(1),
-  datasetName: z.string().min(1),
-});
-
-/** What the settings dialog can change. Everything else comes from introspection. */
+/**
+ * What the settings dialog can change. The connection is environment-owned, and
+ * the date range is whatever the model actually contains - neither belongs here.
+ */
 export const datasetSettingsInputSchema = z.object({
   description: z.string().max(1_000).optional(),
   /*
@@ -84,7 +91,12 @@ export const datasetSettingsInputSchema = z.object({
    * question in the worst case, so an unbounded field is an unbounded bill.
    */
   extraContext: z.string().max(8_000).optional(),
-  dateRange: z.object({ min: z.iso.date(), max: z.iso.date() }).optional(),
+});
+
+/** The prose the model writes about itself, in the admin's language. */
+export const generatedDatasetContextSchema = z.object({
+  description: z.string(),
+  extraContext: z.string(),
 });
 
 const reconcileCountSchema = z.object({
@@ -95,8 +107,8 @@ const reconcileCountSchema = z.object({
 
 /**
  * The outcome of one introspection run. `warnings` carries everything the
- * heuristics could not decide — an undetected date table, hidden tables that
- * were skipped — because those are exactly what the admin has to fix by hand.
+ * heuristics could not decide - an undetected date table, hidden tables that
+ * were skipped - because those are exactly what the admin has to fix by hand.
  */
 export const introspectionReportSchema = z.object({
   datasetId: z.uuid(),
@@ -108,6 +120,8 @@ export const introspectionReportSchema = z.object({
   warnings: z.array(z.string()),
   durationMs: z.number().int(),
   lastIntrospectedAt: z.iso.datetime(),
+  /** True when this run also wrote the model's context, which only happens while it is empty. */
+  contextGenerated: z.boolean(),
 });
 
 export const daxResultSchema = z.object({
@@ -125,7 +139,8 @@ export type DatasetMeasure = z.infer<typeof datasetMeasureSchema>;
 export type DatasetSynonym = z.infer<typeof datasetSynonymSchema>;
 export type DatasetContext = z.infer<typeof datasetContextSchema>;
 export type DatasetSummary = z.infer<typeof datasetSummarySchema>;
-export type DatasetConnectionInput = z.infer<typeof datasetConnectionInputSchema>;
+export type DatasetSource = z.infer<typeof datasetSourceSchema>;
+export type GeneratedDatasetContext = z.infer<typeof generatedDatasetContextSchema>;
 export type DatasetSettingsInput = z.infer<typeof datasetSettingsInputSchema>;
 export type IntrospectionReport = z.infer<typeof introspectionReportSchema>;
 export type DaxResult = z.infer<typeof daxResultSchema>;

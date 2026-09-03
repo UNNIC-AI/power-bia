@@ -10,7 +10,7 @@
    theme variables inside `@layer base`, so an unlayered rule wins without
    having to replicate the plugin's `:root:has(...)` selectors.
 
-   daisyUI splits radius into three scales — selectors (checkbox, toggle, badge),
+   daisyUI splits radius into three scales - selectors (checkbox, toggle, badge),
    fields (input, button, tab) and boxes (card, modal, menu). Holding them equal
    is what makes a field, a card and a menu agree, so they all read one knob:
    change `--radius-app` and every corner in the app follows. Components must not

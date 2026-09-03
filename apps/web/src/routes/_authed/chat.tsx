@@ -6,13 +6,14 @@ import { useTranslation } from 'react-i18next';
 import { ConfirmDialog } from '../../components/ConfirmDialog.tsx';
 import { ChatPanel } from '../../components/chat/ChatPanel.tsx';
 import { Sidebar } from '../../components/Sidebar.tsx';
-import { useDataset } from '../../lib/dataset-context.tsx';
+
 import { formatDay } from '../../lib/format.ts';
 import {
   useAddWidget,
   useConversation,
   useConversations,
   useDashboards,
+  useDataset,
   useDeleteConversation,
   useRegenerateConversationTitle,
   useRenameConversation,
@@ -41,7 +42,7 @@ function ChatRoute() {
   const navigate = useNavigate();
   const { c: conversationId } = Route.useSearch();
 
-  const { active } = useDataset();
+  const dataset = useDataset();
   const conversations = useConversations();
   const conversation = useConversation(conversationId ?? null);
   const renameConversation = useRenameConversation();
@@ -57,13 +58,13 @@ function ChatRoute() {
    * is right for every way of changing conversation but one: a brand-new
    * conversation learns its id from the first frame of its own answer stream.
    * Remounting there tore down the in-flight `useChat`, and the history that
-   * replaced it could not contain the answer yet — the API persists the
+   * replaced it could not contain the answer yet - the API persists the
    * assistant message only once the stream has finished. That was the "answer
    * only shows up after a refresh" bug.
    *
    * So the panel is keyed on a generation that advances on every move of `?c=`
    * except that one. Reconciling here rather than in the navigation helpers is
-   * what keeps the browser's own Back and Forward honest — they move the search
+   * what keeps the browser's own Back and Forward honest - they move the search
    * param without going through `select`.
    */
   const [panel, setPanel] = useState<PanelState>({
@@ -92,8 +93,7 @@ function ChatRoute() {
   /** Deleting is irreversible, so the row is held here until it is confirmed. */
   const [pendingDelete, setPendingDelete] = useState<{ id: string; title: string } | null>(null);
 
-  const datasetId = active?.id;
-  if (!datasetId) return null;
+  if (!dataset.data) return null;
 
   const select = (id: string | undefined) => {
     void navigate({ to: '/chat', search: { c: id } });
@@ -156,13 +156,12 @@ function ChatRoute() {
             /*
              * Remounting on conversation change replays that conversation's
              * history. useChat reads `messages` only when it initialises, so the
-             * panel must not mount until the history has actually arrived —
+             * panel must not mount until the history has actually arrived -
              * otherwise it initialises empty and the messages never appear.
              * `owned` is excluded from the spinner above for the same reason the
              * key is pinned: that panel is already showing the live answer.
              */
             key={current.generation}
-            datasetId={datasetId}
             locale={locale}
             conversationId={conversationId ?? null}
             history={conversation.data?.messages ?? []}

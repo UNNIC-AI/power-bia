@@ -49,7 +49,6 @@ function toUIMessages(messages: readonly Message[]): ChatUIMessage[] {
 }
 
 interface Props {
-  datasetId: string;
   locale: Locale;
   conversationId: string | null;
   history: readonly Message[];
@@ -58,7 +57,6 @@ interface Props {
 }
 
 export function ChatPanel({
-  datasetId,
   locale,
   conversationId,
   history,
@@ -76,7 +74,7 @@ export function ChatPanel({
       new DefaultChatTransport<ChatUIMessage>({
         api: '/api/chat',
         credentials: 'same-origin',
-        body: () => ({ datasetId, locale, conversationId, filters: [], forcedChartType: null }),
+        body: () => ({ locale, conversationId, filters: [], forcedChartType: null }),
         // The API takes a single question, not the AI SDK's message array.
         prepareSendMessagesRequest: ({ messages, body }) => {
           const last = messages.at(-1);
@@ -85,7 +83,7 @@ export function ChatPanel({
           return { body: { ...body, text } };
         },
       }),
-    [datasetId, locale, conversationId],
+    [locale, conversationId],
   );
 
   const { messages, sendMessage, status, error } = useChat<ChatUIMessage>({
@@ -103,7 +101,7 @@ export function ChatPanel({
   const busy = status === 'submitted' || status === 'streaming';
 
   /*
-   * Sending pulls the new question — and the thinking indicator under it — into
+   * Sending pulls the new question - and the thinking indicator under it - into
    * view. Keyed on the number of questions rather than on `messages` so that the
    * streaming answer does not yank the viewport on every token, and seeded with
    * the mount-time count so replaying a conversation's history does not scroll.
@@ -122,7 +120,7 @@ export function ChatPanel({
   }, [questionCount]);
 
   /*
-   * The question each answer came from — the user turn just before it. Pinning
+   * The question each answer came from - the user turn just before it. Pinning
    * used to attach whatever was typed last, which was wrong for every card but
    * the newest one, and empty for a conversation replayed from history.
    */

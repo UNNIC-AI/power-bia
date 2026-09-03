@@ -42,7 +42,7 @@ app.MapPost("/query", (DaxRequest request) =>
     catch (AdomdException exception)
     {
         // The message is the Power BI error text, which the API feeds back into
-        // its DAX repair step — it must survive intact.
+        // its DAX repair step - it must survive intact.
         return Results.UnprocessableEntity(new ErrorResult(exception.Message));
     }
     catch (Exception exception)

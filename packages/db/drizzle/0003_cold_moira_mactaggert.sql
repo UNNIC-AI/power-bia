@@ -1,0 +1,1 @@
+ALTER TABLE "datasets" ADD COLUMN "extra_context_generated_at" timestamp with time zone;

@@ -3,7 +3,7 @@ import { defineConfig } from 'vitest/config';
 /**
  * Tests are collected from `src` only.
  *
- * Vitest 4 narrowed its `defaultExclude` to `node_modules` and `.git` — `dist`
+ * Vitest 4 narrowed its `defaultExclude` to `node_modules` and `.git` - `dist`
  * was on that list in v3 and no longer is. Since `pnpm build` compiles every
  * `*.test.ts` into `dist/`, the default globs then pick up both copies: the suite
  * silently reports double the tests, and a stale compiled copy keeps passing
@@ -15,5 +15,8 @@ import { defineConfig } from 'vitest/config';
 export default defineConfig({
   test: {
     include: ['src/**/*.{test,spec}.ts'],
+    // Fills the environment before `env.ts` parses it, and before any route test
+    // imports the app. See src/test/env.ts.
+    setupFiles: ['./src/test/env.ts'],
   },
 });

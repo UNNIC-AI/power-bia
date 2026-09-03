@@ -16,6 +16,7 @@ import type { FastifyInstance } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { requireUser } from '../app.js';
+import { findActiveDataset } from '../datasets/provision.js';
 import { retitleDashboard } from '../pipeline/retitle.js';
 
 const dashboardParams = z.object({ id: z.uuid() });
@@ -55,10 +56,9 @@ export async function dashboardRoutes(app: FastifyInstance) {
         orderBy: asc(schema.dashboards.createdAt),
       });
 
-      return dashboards.map(({ id, name, datasetId, createdAt, widgets }) => ({
+      return dashboards.map(({ id, name, createdAt, widgets }) => ({
         id,
         name,
-        datasetId,
         createdAt: createdAt.toISOString(),
         widgetCount: widgets.length,
       }));
@@ -84,17 +84,30 @@ export async function dashboardRoutes(app: FastifyInstance) {
     },
   );
 
-  route.post('/', { schema: { body: createDashboardSchema } }, async (request, reply) => {
-    const user = requireUser(request);
+  route.post(
+    '/',
+    {
+      schema: {
+        body: createDashboardSchema,
+        response: { 200: dashboardSchema, 404: errorSchema, 500: errorSchema },
+      },
+    },
+    async (request, reply) => {
+      const user = requireUser(request);
 
-    const [dashboard] = await app.db
-      .insert(schema.dashboards)
-      .values({ ...request.body, userId: user.id })
-      .returning();
-    if (!dashboard) return reply.code(500).send({ message: 'Could not create dashboard' });
+      // A view belongs to the one model the environment names; the client cannot pick.
+      const active = await findActiveDataset(app.db);
+      if (!active) return reply.code(404).send({ message: 'No model configured' });
 
-    return { ...dashboard, widgets: [] };
-  });
+      const [dashboard] = await app.db
+        .insert(schema.dashboards)
+        .values({ name: request.body.name, datasetId: active.id, userId: user.id })
+        .returning();
+      if (!dashboard) return reply.code(500).send({ message: 'Could not create dashboard' });
+
+      return { ...dashboard, widgets: [] };
+    },
+  );
 
   route.patch(
     '/:id',
@@ -125,7 +138,6 @@ export async function dashboardRoutes(app: FastifyInstance) {
       return {
         id: updated.id,
         name: updated.name,
-        datasetId: updated.datasetId,
         createdAt: updated.createdAt.toISOString(),
         widgetCount,
       };
@@ -165,7 +177,6 @@ export async function dashboardRoutes(app: FastifyInstance) {
         return {
           id: dashboard.id,
           name: name ?? dashboard.name,
-          datasetId: dashboard.datasetId,
           createdAt: dashboard.createdAt.toISOString(),
           widgetCount,
         };

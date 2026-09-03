@@ -1,0 +1,15 @@
+# A Windows checkout must not rewrite every file.
+* text=auto eol=lf
+
+*.sh text eol=lf
+*.png binary
+*.jpg binary
+*.ico binary
+*.woff binary
+*.woff2 binary
+*.dll binary
+
+# Generated: reviewers should not be asked to read these.
+pnpm-lock.yaml linguist-generated=true -diff
+apps/web/src/routeTree.gen.ts linguist-generated=true -diff
+packages/db/drizzle/** linguist-generated=true

@@ -10,7 +10,7 @@ const WIDGET_LIMIT = 12;
 
 /**
  * Titles are generated from what a conversation or a view actually contains,
- * rather than from the first question — which stopped describing the thread as
+ * rather than from the first question - which stopped describing the thread as
  * soon as it moved on. Both entry points read the content back from Postgres so
  * there is one code path for the automatic pass and for the explicit one.
  *

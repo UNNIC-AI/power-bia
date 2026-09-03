@@ -58,12 +58,18 @@ export const datasets = pgTable('datasets', {
   dateMin: text('date_min').notNull(),
   dateMax: text('date_max').notNull(),
   /**
-   * Free text an admin writes about the model. It reaches every prompt stage and
-   * is the only channel for what introspection cannot infer: what an
-   * undescriptive table name means, business vocabulary, or a correction to
-   * something the heuristics deduced wrong.
+   * Prose about the model. First written by the LLM from the introspected
+   * catalogue, then curated by an admin. It reaches every prompt stage and is
+   * the only channel for what introspection cannot infer: what an undescriptive
+   * table name means, business vocabulary, or a correction to something the
+   * heuristics deduced wrong.
    */
   extraContext: text('extra_context').notNull().default(''),
+  /**
+   * When the LLM last wrote `extraContext`. Nulled the moment an admin saves
+   * their own text, so the UI never labels a human's words as generated.
+   */
+  extraContextGeneratedAt: timestamp('extra_context_generated_at', { withTimezone: true }),
   lastIntrospectedAt: timestamp('last_introspected_at', { withTimezone: true }),
   createdAt,
 });
@@ -123,16 +129,22 @@ export const datasetMeasures = pgTable(
   (t) => [uniqueIndex('dataset_measures_name_idx').on(t.datasetId, t.name)],
 );
 
-export const datasetRelationships = pgTable('dataset_relationships', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  datasetId: uuid('dataset_id')
-    .notNull()
-    .references(() => datasets.id, { onDelete: 'cascade' }),
-  fromColumn: text('from_column').notNull(),
-  toColumn: text('to_column').notNull(),
-  cardinality: cardinality('cardinality').notNull(),
-  isActive: boolean('is_active').notNull().default(true),
-});
+export const datasetRelationships = pgTable(
+  'dataset_relationships',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    datasetId: uuid('dataset_id')
+      .notNull()
+      .references(() => datasets.id, { onDelete: 'cascade' }),
+    fromColumn: text('from_column').notNull(),
+    toColumn: text('to_column').notNull(),
+    cardinality: cardinality('cardinality').notNull(),
+    isActive: boolean('is_active').notNull().default(true),
+  },
+  // The other catalogue tables reach this column through a unique index; this one
+  // has none, and repointing the environment deletes every row by dataset_id.
+  (t) => [index('dataset_relationships_dataset_idx').on(t.datasetId)],
+);
 
 export const datasetSynonyms = pgTable(
   'dataset_synonyms',
@@ -240,7 +252,12 @@ export const daxQueryLog = pgTable(
     error: text('error'),
     createdAt,
   },
-  (t) => [index('dax_query_log_dataset_idx').on(t.datasetId, t.createdAt)],
+  (t) => [
+    index('dax_query_log_dataset_idx').on(t.datasetId, t.createdAt),
+    // Deleting an account nulls this column across the log; unindexed, that is a
+    // sequential scan of every query ever run.
+    index('dax_query_log_user_idx').on(t.userId),
+  ],
 );
 
 export const usersRelations = relations(users, ({ many }) => ({

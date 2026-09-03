@@ -1,0 +1,29 @@
+# Rendered at container start by the nginx image's envsubst step. Only variables
+# whose name starts with API_ are substituted (NGINX_ENVSUBST_FILTER), so nginx's
+# own $host and $remote_addr below survive intact.
+server {
+    listen 8080;
+    server_name _;
+
+    root /usr/share/nginx/html;
+    index index.html;
+
+    # The app is a single-page app: every unknown path is a client route.
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+    # Same-origin API, which is what lets the session cookie stay SameSite=Strict.
+    location /api/ {
+        proxy_pass ${API_URL};
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        # Chat answers stream token by token; buffering would deliver them in one lump.
+        proxy_buffering off;
+        proxy_read_timeout 300s;
+    }
+}

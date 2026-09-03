@@ -40,6 +40,33 @@ The plan put `Table[Column]` → `Column` normalisation in the gateway. It is in
 `dax/columns.ts` instead, so any second executor shares the behaviour rather than
 reimplementing it in another language.
 
+### One model, named by the environment and nowhere else **[user]**
+
+`PBI_*` in `.env` is the only authority on which Power BI model the app talks to.
+The API writes those five values into the `datasets` row on every boot
+(`datasets/provision.ts`). There is no route that creates, lists, connects or
+deletes a model, no id in any `/api/dataset` path, and no picker in the UI.
+Switching models is an `.env` edit plus a restart.
+
+The MVP — and this app until recently — let an admin type a connection into the
+UI, which meant two authorities for the same fact: a `.env` nobody trusted and a
+database row nobody could see. Then it grew a dataset list and a navbar selector,
+which was a third: whichever row the browser happened to remember.
+
+What it costs: an instance cannot serve two models. That is the intent. Anyone
+who needs two runs two instances, which is also the only way to keep their
+credentials, catalogues and curated notes apart.
+
+The row is **reused** rather than replaced on a source change, so conversations
+and dashboards survive. The one decision that throws data away — "does this stored
+row describe a different model?" — is isolated in `pointsElsewhere`
+(`datasets/source.ts`) and has a test. Which row is the active one is
+`selectActiveRow` in the same file, shared by provisioning and by every request.
+
+Rows the environment does not point at can only exist in a database that predates
+the reuse rule. They are unreachable and are logged at boot, never deleted: a
+stale row still owns somebody's conversations.
+
 ### Model catalog in Postgres, curated by hand **[user]**
 
 `note` and `labels` on `dataset_columns` are curated; everything else is
@@ -199,6 +226,58 @@ deep-linkable.
 `apps/*` set `declaration: false, composite: false`. Emitting `.d.ts` from the API
 would require naming the AI SDK's internal stream types, which are not portably
 nameable. Only `packages/*` are consumable.
+
+### A route file exports `Route` and nothing else
+
+The page component lives in `components/`; the file under `routes/` is a
+three-line wrapper. Exporting anything else from a route file defeats the router
+plugin's automatic code splitting, and it makes the page untestable without
+standing up the real route tree. `LoginForm` was the first one moved.
+
+---
+
+## Operations
+
+### Three ways to run it, and Nix is never the only one **[departure]**
+
+`docker compose`, plain pnpm with Node 24 on the host, and `nix develop` all
+work, and the canonical commands live in `package.json` so all three run the same
+thing. The devshell provides the toolchain and nothing else.
+
+Before this, the README told people the host needed no Node and `start.sh` exited
+without Nix — which made a Nix installation a hard prerequisite for a TypeScript
+project.
+
+### Every service runs alone, in Docker or on the host
+
+Each compose service declares a profile, publishes its port, carries
+`extra_hosts: ["host.docker.internal:host-gateway"]`, and takes every dependency
+address from an environment variable. No source file names a neighbour. That is
+what makes "API in Docker, Postgres on the host" a `.env` edit — the combinations
+are in [development.md](./development.md).
+
+The one literal that used to break this was the Vite proxy target; it is now
+`API_PROXY_TARGET`.
+
+### The flake exposes devShells and checks, not packages
+
+The deployable artifacts are the Docker images. A `buildNpmPackage` of a pnpm
+workspace would be a second, divergent build of the same thing, with an
+`npmDepsHash` to re-paste on every lockfile edit. `nix flake check` runs what Nix
+can check hermetically — the Nix formatting and shellcheck — and the JavaScript
+lint, typecheck and tests stay in CI where pnpm has already installed
+`node_modules`.
+
+### The database-backed tests refuse to skip in CI
+
+They need a real Postgres and create a throwaway database per vitest worker
+(`apps/api/src/test/database.ts`). Locally they skip when `DATABASE_URL` is unset,
+because a fresh clone should not fail before Docker is up. Under `CI` they throw
+instead: a database-backed suite that quietly passes because nobody started
+Postgres is worse than one that fails.
+
+SQLite was never an option. The queries under test are Drizzle against Postgres 17
+with `jsonb`, enums and cascading foreign keys.
 
 ---
 

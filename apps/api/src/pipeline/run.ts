@@ -24,7 +24,7 @@ const MESSAGES = {
       `I don't have data for that period. You asked for ${requested} and the available data covers ${available}.`,
   },
   filterCreated: {
-    es: (title: string, count: number) => `Filtro «${title}» creado con ${count} valores.`,
+    es: (title: string, count: number) => `Filtro "${title}" creado con ${count} valores.`,
     en: (title: string, count: number) => `Filter "${title}" created with ${count} values.`,
   },
   filterFailed: {

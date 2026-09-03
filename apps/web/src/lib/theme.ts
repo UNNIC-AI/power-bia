@@ -3,7 +3,7 @@ const STORAGE_KEY = 'powerbia.theme';
 export type Theme = 'light' | 'dark';
 
 /**
- * The mode stays light/dark throughout the app — the chart palette and axis ink
+ * The mode stays light/dark throughout the app - the chart palette and axis ink
  * are keyed on the surface, not on whichever daisyUI theme paints it. Only this
  * map knows the theme names, so swapping one is a one-line change.
  */

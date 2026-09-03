@@ -11,12 +11,19 @@ edit it.
 
 ```
 __root.tsx              Outlet + 404
-login.tsx               Sign in / register (one form, toggled)
-_authed.tsx             Auth guard + app shell (sidebar toggle, dataset strip, theme, locale, logout)
+login.tsx               -> components/LoginForm.tsx
+_authed.tsx             Auth guard + app shell (sidebar toggle, model strip, theme, locale, logout)
 _authed/index.tsx       redirect → /chat
 _authed/chat.tsx        Sidebar of chats + ChatPanel
 _authed/dashboards.tsx  Sidebar of views + DashboardCanvas
 ```
+
+**A route file exports `Route` and nothing else.** The page component lives in
+`components/`; `login.tsx` is three lines. Exporting anything else from a route
+file defeats the plugin's automatic code splitting, and it makes the page
+untestable without standing up the real route tree — `LoginForm.test.tsx` renders
+the component directly. A `*.test.tsx` sitting under `routes/` is excluded by the
+plugin's `routeFileIgnorePattern`.
 
 Selection lives in **typed search params** rather than path params: `/chat?c=<id>`
 and `/dashboards?d=<id>`. Fewer route files, still deep-linkable. Note that
@@ -51,6 +58,14 @@ typed fetch wrapper that throws `ApiError` with the server's message.
 No global client state library. Theme is a small context (`lib/theme-context.tsx`),
 whether the sidebar is open is another (`lib/sidebar-context.tsx`), locale is
 i18next, everything else is server state or local component state.
+
+**The model is server state, not client state.** `useDataset()` is a plain query
+over `GET /api/dataset`, which returns the one model the environment names. There
+used to be a `DatasetProvider` holding a selection in `localStorage` and a picker
+in the navbar; both are gone, along with every `datasetId` in a request body. The
+navbar shows the model's name, date range and counts, and nothing there is
+clickable — switching model is an `.env` edit plus a restart. A 404 from that
+query is the shell's empty state, not an error.
 
 The sidebar needs a context because the toggle lives in the navbar and the panel
 it opens lives inside each route, so the state has to sit above both. Open is the
@@ -130,6 +145,51 @@ titles and the menu that opened it has already closed.
 
 Removing a **widget** from a view is deliberately not guarded: it is a single card
 that can be pinned again from chat, not a thread or a whole dashboard.
+
+Removing a **user** is guarded and says what goes with the account — their
+conversations and their views. Because that confirmation opens on top of the
+Users dialog, `ConfirmDialog` sits at `z-60`/`z-70`, above the `z-40`/`z-50`
+of the ordinary dialogs: an alert is always the topmost thing on screen.
+
+## Model settings
+
+`components/SettingsDialog.tsx` (admin, from the account menu) is deliberately not
+a connection form. Which Power BI model the app talks to comes from `PBI_*` on the
+server, so the dialog shows `workspace / dataset` read-only and says how to change
+it. There is no create, no delete, and no date-range field: the range is whatever
+the model contains, probed on every sync.
+
+What is left is the fourth prompt layer, `datasets.extra_context`, and the two
+buttons that produce it:
+
+- **Sync model** (`POST /:id/introspect`) re-reads the catalogue, and writes the
+  context too if the field is still empty.
+- **Reprocess context** (`POST /:id/context`) has the assistant rewrite it from
+  the catalogue. It replaces the stored text, edits included, so it goes through
+  `ConfirmDialog` first.
+
+The stamp under the textarea distinguishes the two authors — "written by the
+assistant on …" while `extraContextGeneratedAt` is set, "edited by hand" once a
+save has cleared it — because an admin correcting a paragraph needs to know
+whether they are correcting a person or a draft.
+
+## Accounts
+
+There is no sign-up. `login.tsx` asks `GET /auth/setup` and renders the
+first-admin form only while the instance has no accounts at all; otherwise it is
+a sign-in form and a line saying that an admin creates accounts.
+
+`components/UsersDialog.tsx` (admin, from the account menu) lists every account
+and adds, removes and resets passwords. `components/AccountDialog.tsx` is the
+whole of a member's self-service: their password, nothing else.
+
+Both use `components/PasswordField.tsx`, an input with a reveal toggle. The
+button is a **sibling** of the `<label>`, not a child — a label forwards clicks
+to its control, and interactive content inside one is invalid anyway.
+
+`lib/auth-errors.ts` maps status codes to sentences. Without it a wrong password
+and an unreachable API both read as "Request failed (502)", because the Vite dev
+proxy answers with no JSON body for `ApiError` to carry.
 
 ## Card renderers
 

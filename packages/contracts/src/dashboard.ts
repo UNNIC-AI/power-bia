@@ -23,22 +23,17 @@ export const widgetSchema = z.object({
 export const dashboardSchema = z.object({
   id: z.uuid(),
   name: z.string(),
-  datasetId: z.uuid(),
   widgets: z.array(widgetSchema),
 });
 
 export const dashboardSummarySchema = z.object({
   id: z.uuid(),
   name: z.string(),
-  datasetId: z.uuid(),
   widgetCount: z.number().int(),
   createdAt: z.iso.datetime(),
 });
 
-export const createDashboardSchema = z.object({
-  name: z.string().min(1).max(120),
-  datasetId: z.uuid(),
-});
+export const createDashboardSchema = z.object({ name: z.string().min(1).max(120) });
 
 export const renameDashboardSchema = z.object({ name: z.string().min(1).max(120) });
 

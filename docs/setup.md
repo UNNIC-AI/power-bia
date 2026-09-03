@@ -4,7 +4,7 @@ What is needed to make the real pipeline work — a question in, DAX executed
 against Power BI, an answer out.
 
 The app already runs **without** any of this in demo mode
-(`pnpm --filter @powerbia/api demo`, see [docs/README.md](./docs/README.md)).
+(`pnpm --filter @powerbia/api demo`, see [../README.md](../README.md)).
 Everything below is only for the live path.
 
 ---
@@ -47,7 +47,7 @@ with a precise message rather than failing later.
 | `LLM_MODEL` | `gpt-4.1` | Must support strict structured outputs |
 | `POSTGRES_PASSWORD` | `powerbia` | Compose only; must agree with `DATABASE_URL` |
 
-### `PBI_*` behaves differently — read this
+### `PBI_*` — the only place the Power BI model is chosen
 
 | Variable | Value |
 |---|---|
@@ -56,15 +56,23 @@ with a precise message rather than failing later.
 | `PBI_CLIENT_SECRET` | Client secret **value** |
 | `PBI_WORKSPACE_NAME` | Workspace name, exactly as shown in Power BI |
 | `PBI_DATASET_NAME` | Semantic model name, exactly as shown |
+| `PBI_MODEL_NAME` | Optional display name for the UI. Defaults to `PBI_DATASET_NAME` |
 
-These are **not runtime API config**. They are read once by
-`packages/db/src/seed.ts` and written into the `datasets` row with the secret
-encrypted; the API then reads the connection from the database.
+The API reads all five on every boot and writes them into the `datasets` row, with
+the secret encrypted (`provisionDatasetFromEnv`, `apps/api/src/datasets/provision.ts`).
+Nothing in the UI can change them.
 
-- Editing them after seeding does nothing. Re-seed on an empty database, or
-  `UPDATE datasets SET …`.
+- **To point the app at a different model: edit these and restart.** The row is
+  reused, so conversations and dashboards survive. Because the catalogue then
+  describes a model nobody is querying any more, it is dropped along with the
+  generated context, and the new model is introspected during that same boot.
+- The five are a unit. With any of them missing the API still boots and serves
+  whatever the database holds — that is what demo mode relies on — and logs a
+  warning.
 - Quote values containing spaces (`PBI_WORKSPACE_NAME="My Workspace"`) or
   `set -a; . ./.env` breaks.
+- `MODEL_CONTEXT_LOCALE` (`es` by default) is the language the assistant writes
+  the model's context in when it does so at boot, with no user to ask.
 
 ## 3. The Azure / Power BI side
 
@@ -96,28 +104,38 @@ Not environment variables, all required, and **the most likely blocker**.
 6. **Egress** — the gateway needs `login.microsoftonline.com` and `*.powerbi.com`
    on 443; the API needs `api.openai.com`.
 
-## 4. Two code gaps that block this regardless of credentials
+## 4. Two things about the local setup
 
-### 4.1 The gateway is not reachable from the host
+### 4.1 The gateway port
 
-`docker-compose.yml` only `expose`s port 8080, deliberately — just the API should
-reach it. But **`apps/api` has no Dockerfile**, so the API cannot run inside
-compose either. Until an API image exists, publish the port:
+`docker-compose.yml` publishes 8080, because the normal development shape is the
+API running on the host and needing to reach the gateway:
 
-```yaml
-# docker-compose.yml → dax-gateway
-ports:
-  - "8080:8080"
+```bash
+docker compose --profile gateway up -d
 ```
 
-The gateway container image has also **never been built**: `dotnet build` passes,
-but `docker compose build dax-gateway` is unverified.
+**In a deployment it is not published.** The gateway holds the service principal
+credentials and only `apps/api` has any business reaching it, so
+`docker-compose.prod.yml` uses `expose` instead of `ports`. See
+[deployment.md](./deployment.md).
 
-### 4.2 No way to register a dataset through the app
+The container image builds and serves live DAX. It needed
+`services/dax-gateway/.dockerignore`: the host `obj/` was being copied over the
+container's restore output by `COPY . .`, and the ADOMD package then failed with
+`NETSDK1064: package … was not found`.
 
-`GET /api/datasets`, `GET /api/datasets/:id/context` and `DELETE` exist; `POST`
-does not. The seed script is the only path and it hardcodes the Iowa model.
-See [docs/todo.md](./docs/todo.md) P1 #4 and #5.
+### 4.2 There is no way to register a model through the app, on purpose
+
+There is one Power BI model and the `PBI_*` block above is the only place it is
+named. The API writes those values into the `datasets` row on every boot
+(`datasets/provision.ts`), so there is no create, list or delete route, no id in
+any `/api/dataset` path, and no picker in the UI.
+
+Switching models is: edit `.env`, restart. The row is reused, so conversations and
+dashboards survive; if the workspace or dataset name changed, the previous model's
+catalogue and generated context are dropped and the new one is introspected in
+that same start.
 
 ## 5. Order to do it in
 
@@ -125,11 +143,11 @@ See [docs/todo.md](./docs/todo.md) P1 #4 and #5.
    administrator and have the longest lead time.
 2. Create the app registration (§3.1) and add it to the workspace (§3.4).
 3. Fill `.env` with the generated secrets, `OPENAI_API_KEY` and the `PBI_*` values.
-4. Publish the gateway port (§4.1) and point `DAX_GATEWAY_URL` at it.
-5. Bring it up:
+4. Point `DAX_GATEWAY_URL` at `http://localhost:8080` (§4.1).
+5. Bring it up — `./start.sh live --smoke` does 5 and 6 in one go, or by hand:
 
    ```bash
-   docker compose up -d postgres dax-gateway
+   docker compose --profile db --profile gateway up -d
    pnpm db:migrate
    pnpm db:seed
    ```
@@ -154,6 +172,6 @@ See [docs/todo.md](./docs/todo.md) P1 #4 and #5.
 
 7. Only then ask a question in the UI.
 
-Expect to iterate on the prompts once real DAX starts flowing — **no question has
-ever been answered end to end**. [docs/todo.md](./docs/todo.md) P0 covers what to
-watch for.
+Expect to iterate on the prompts once real DAX starts flowing. Four questions
+have been answered end to end (see [README.md](./README.md)), which is a smoke
+test, not coverage — [todo.md](./todo.md) P0 covers what to watch for.

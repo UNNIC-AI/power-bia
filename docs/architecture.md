@@ -52,8 +52,10 @@ Promoting it to a long-lived HTTP service removes both.
 **The gateway is stateless.** It receives the Power BI credentials with each
 request rather than holding a registry. That keeps Postgres as the single place
 secrets live, and means the gateway needs no database access, no migrations and no
-deploy coupling. It is not port-published in compose — only the API reaches it,
-over the internal network, with a shared bearer token.
+deploy coupling. In production it is not port-published — only the API reaches it,
+over the internal network, with a shared bearer token. The development compose
+file does publish it, because the normal shape there is an API running on the
+host; `docker-compose.prod.yml` takes the port back out.
 
 **The gateway has one query endpoint, not two.** Model introspection uses DAX
 `INFO.*` functions, which go through the same `/query` path. A separate
@@ -63,7 +65,7 @@ over the internal network, with a shared bearer token.
 
 1. **`apps/web`** — `useChat` posts to `/api/chat`. The AI SDK's transport wants
    to send a message array; `prepareSendMessagesRequest` reshapes the body into
-   the API's `{ datasetId, conversationId, text, locale, filters, forcedChartType }`
+   the API's `{ conversationId, text, locale, filters, forcedChartType }`
    contract.
 2. **`routes/chat.ts`** — resolves the session, loads the `DatasetContext` and the
    decrypted connection, finds or creates the conversation, reads the last few

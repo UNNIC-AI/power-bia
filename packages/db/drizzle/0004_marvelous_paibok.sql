@@ -1,0 +1,2 @@
+CREATE INDEX "dataset_relationships_dataset_idx" ON "dataset_relationships" USING btree ("dataset_id");--> statement-breakpoint
+CREATE INDEX "dax_query_log_user_idx" ON "dax_query_log" USING btree ("user_id");

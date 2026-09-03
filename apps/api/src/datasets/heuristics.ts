@@ -17,7 +17,7 @@ import {
  * gap deterministically.
  *
  * They are validated against the Iowa model, whose hand-written catalogue in
- * `packages/db/src/seed.ts` is the expected output — see heuristics.test.ts.
+ * `packages/db/src/seed.ts` is the expected output - see heuristics.test.ts.
  */
 
 const NUMERIC_TYPES = new Set<number>([DATA_TYPE.int64, DATA_TYPE.double, DATA_TYPE.decimal]);
@@ -114,7 +114,7 @@ function mapCardinality(relationship: RawRelationship): '*:1' | '1:1' | '1:*' {
 
 /**
  * `date` if the model says so, or if the table is the one-side of a relationship
- * joined on a datetime column — that is what a calendar table looks like from
+ * joined on a datetime column - that is what a calendar table looks like from
  * the outside. `fact` if the table is the many-side of at least one
  * relationship. Everything else is a dimension.
  *
@@ -266,7 +266,7 @@ export function buildModel(raw: RawModel): IntrospectedModel {
        * related at all, which produces DAX that cannot run.
        */
       warnings.push(
-        `Relación muchos-a-muchos ${fromTable.name}[${fromColumn.name}] → ${toTable.name}[${toColumn.name}] registrada como *:1.`,
+        `Relación muchos-a-muchos ${fromTable.name}[${fromColumn.name}] -> ${toTable.name}[${toColumn.name}] registrada como *:1.`,
       );
     }
 

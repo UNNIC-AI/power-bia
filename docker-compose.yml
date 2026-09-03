@@ -1,16 +1,36 @@
 name: powerbia
 
+# Every service declares a profile, so nothing starts implicitly and any one of
+# them can run in Docker while its neighbours run on the host:
+#
+#   docker compose --profile all up            everything
+#   docker compose --profile db up -d          just Postgres, the rest on the host
+#   docker compose --profile db --profile api up
+#   docker compose --profile web up            web in Docker, API on the host
+#
+# Nothing addresses a neighbour by a hardcoded name: every address is an env var
+# with a compose-network default, so pointing a container at a process on the
+# host is an `.env` edit (`host.docker.internal` resolves everywhere thanks to
+# the anchor below).
+
+x-host: &host
+  extra_hosts:
+    - "host.docker.internal:host-gateway"
+
 services:
   postgres:
     image: postgres:17-alpine
+    profiles: [db, all]
     restart: unless-stopped
     environment:
       POSTGRES_USER: powerbia
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-powerbia}
       POSTGRES_DB: powerbia
     ports:
-      # Published so drizzle-kit and psql can reach it from the dev shell.
-      - "5432:5432"
+      # Published so drizzle-kit, psql and a host-run API can reach it. The host
+      # side is a variable so a second instance, or a port already taken by
+      # something else, does not need the file edited.
+      - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -20,22 +40,97 @@ services:
       retries: 10
 
   dax-gateway:
+    <<: *host
     build:
       context: ./services/dax-gateway
+    profiles: [gateway, api, all]
     restart: unless-stopped
     environment:
       DAX_GATEWAY_TOKEN: ${DAX_GATEWAY_TOKEN:?set DAX_GATEWAY_TOKEN in .env}
       ASPNETCORE_URLS: http://0.0.0.0:8080
-    # Deliberately NOT published. The gateway holds the Power BI service
-    # principal credentials and speaks to the XMLA endpoint; only apps/api
-    # needs to reach it, over the compose network, with a bearer token.
-    expose:
-      - "8080"
+    # Published because a host-run API has to reach it, which is the normal
+    # development shape. In a deployment take the port back out: the gateway
+    # holds the Power BI service principal credentials and only apps/api needs it.
+    ports:
+      - "${GATEWAY_PORT:-8080}:8080"
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:8080/health"]
       interval: 10s
       timeout: 5s
       retries: 5
+
+  api:
+    <<: *host
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+      target: dev
+    profiles: [api, all]
+    restart: unless-stopped
+    env_file: [.env]
+    environment:
+      # Addresses inside the compose network, under COMPOSE_-prefixed names.
+      #
+      # They cannot reuse DATABASE_URL and DAX_GATEWAY_URL: compose interpolates
+      # .env into this file, so `${DATABASE_URL:-...}` would always resolve to
+      # the host-side value .env already defines and the default would never
+      # apply. Distinct names keep the two shapes from colliding - set
+      # COMPOSE_DATABASE_URL=postgres://...@host.docker.internal:5432/powerbia to
+      # point this container at a Postgres running on the host.
+      DATABASE_URL: ${COMPOSE_DATABASE_URL:-postgres://powerbia:powerbia@postgres:5432/powerbia}
+      DAX_GATEWAY_URL: ${COMPOSE_DAX_GATEWAY_URL:-http://dax-gateway:8080}
+      WEB_ORIGIN: ${WEB_ORIGIN:-http://localhost:5173}
+      PORT: 3000
+    ports:
+      - "${API_PORT:-3000}:3000"
+    volumes:
+      - ./apps/api:/app/apps/api
+      - ./packages:/app/packages
+      # Anonymous volumes: the host's installs must not shadow the container's.
+      - /app/node_modules
+      - /app/apps/api/node_modules
+    depends_on:
+      postgres:
+        condition: service_healthy
+        # False, so the API still starts when Postgres runs on the host.
+        required: false
+
+  web:
+    <<: *host
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      target: dev
+    profiles: [web, all]
+    restart: unless-stopped
+    environment:
+      # COMPOSE_-prefixed for the same reason as the API block above.
+      API_PROXY_TARGET: ${COMPOSE_API_PROXY_TARGET:-http://api:3000}
+    ports:
+      - "${WEB_PORT:-5173}:5173"
+    volumes:
+      - ./apps/web:/app/apps/web
+      - ./packages:/app/packages
+      - /app/node_modules
+      - /app/apps/web/node_modules
+
+  # One-shot. Migrations are never applied by a booting app: two replicas would race.
+  #   docker compose --profile migrate up migrate
+  migrate:
+    <<: *host
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+      target: dev
+    profiles: [migrate]
+    env_file: [.env]
+    environment:
+      DATABASE_URL: ${COMPOSE_DATABASE_URL:-postgres://powerbia:powerbia@postgres:5432/powerbia}
+    command: ["pnpm", "db:migrate"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+        required: false
 
 volumes:
   pgdata:

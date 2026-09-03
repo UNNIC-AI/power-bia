@@ -10,7 +10,7 @@ export function stripCodeFences(text: string): string {
  * model regularly emits a measure there instead:
  *
  *   SUMMARIZECOLUMNS("Sales", <expr>, FILTER(...))
- *   → EVALUATE ROW("Sales", CALCULATE(<expr>, FILTER(...)))
+ *   -> EVALUATE ROW("Sales", CALCULATE(<expr>, FILTER(...)))
  *
  * Fixing it here avoids a round trip through the repair stage.
  */

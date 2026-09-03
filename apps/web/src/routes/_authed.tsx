@@ -8,25 +8,27 @@ import {
   IconMoon,
   IconSettings,
   IconSun,
+  IconUser,
+  IconUsers,
 } from '@tabler/icons-react';
 import { createFileRoute, Outlet, useNavigate } from '@tanstack/react-router';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { AccountDialog } from '../components/AccountDialog.tsx';
 import { Menu, MenuItem, MenuSeparator } from '../components/Menu.tsx';
 import { SettingsDialog } from '../components/SettingsDialog.tsx';
 import { Tooltip } from '../components/Tooltip.tsx';
-import { DatasetProvider, useDataset } from '../lib/dataset-context.tsx';
+import { UsersDialog } from '../components/UsersDialog.tsx';
 import { setLocale } from '../lib/i18n.ts';
-import { useLogout, useMe } from '../lib/queries.ts';
+import { useDataset, useLogout, useMe } from '../lib/queries.ts';
 import { useSidebar } from '../lib/sidebar-context.tsx';
 import { useTheme } from '../lib/theme-context.tsx';
 
 export const Route = createFileRoute('/_authed')({ component: AuthedLayout });
 
 /**
- * The provider wraps the shell rather than sitting in `main.tsx` so that
- * `/datasets` is only requested once there is a session — at the root it would
- * fire a 401 on the login page.
+ * The shell only mounts once there is a session: `/dataset` is authenticated,
+ * and requesting it from the root would fire a 401 on the login page.
  */
 function AuthedLayout() {
   const navigate = useNavigate();
@@ -45,11 +47,7 @@ function AuthedLayout() {
     return null;
   }
 
-  return (
-    <DatasetProvider>
-      <AuthedShell />
-    </DatasetProvider>
-  );
+  return <AuthedShell />;
 }
 
 function AuthedShell() {
@@ -60,8 +58,11 @@ function AuthedShell() {
   const locale = useActiveLocale();
   const { theme, toggle } = useTheme();
   const sidebar = useSidebar();
-  const { datasets, active, select } = useDataset();
+  const dataset = useDataset();
+  const active = dataset.data;
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [accountOpen, setAccountOpen] = useState(false);
+  const [usersOpen, setUsersOpen] = useState(false);
 
   if (!me.data) return null;
   const isAdmin = me.data.role === 'admin';
@@ -89,30 +90,15 @@ function AuthedShell() {
 
         <div className="flex-1" />
 
-        {/* A picker only earns its place once there is something to pick. */}
-        {datasets.length > 1 && (
-          <label className="flex items-center gap-1">
-            <IconDatabase size={14} stroke={1.75} className="text-base-content/50" />
-            <span className="sr-only">{t('nav.dataset')}</span>
-            <select
-              className="select select-ghost select-xs w-40"
-              value={active?.id ?? ''}
-              onChange={(event) => select(event.target.value)}
-            >
-              {datasets.map((dataset) => (
-                <option key={dataset.id} value={dataset.id}>
-                  {dataset.name}
-                </option>
-              ))}
-            </select>
-          </label>
-        )}
-
+        {/*
+          No picker. There is one model, the environment names it, and switching
+          is an `.env` edit plus a restart - see `datasets/provision.ts`.
+        */}
         {active && (
-          <span className="text-base-content/60 hidden text-xs lg:inline">
-            {datasets.length > 1 ? '' : `${active.name} · `}
-            {active.dateRange.min} → {active.dateRange.max} · {active.tableCount} ·{' '}
-            {active.measureCount}
+          <span className="text-base-content/60 hidden items-center gap-1 text-xs lg:inline-flex">
+            <IconDatabase size={14} stroke={1.75} className="text-base-content/50" />
+            {active.name} &middot; {active.dateRange.min} - {active.dateRange.max} &middot;{' '}
+            {active.tableCount} &middot; {active.measureCount}
           </span>
         )}
 
@@ -139,11 +125,24 @@ function AuthedShell() {
             {locale === 'es' ? 'English' : 'Español'}
           </MenuItem>
 
+          <MenuItem onSelect={() => setAccountOpen(true)}>
+            <IconUser size={14} stroke={1.75} />
+            {t('account.title')}
+          </MenuItem>
+
           {/* Introspection hits the customer's capacity, so it is admin-only. */}
           {isAdmin && (
             <MenuItem onSelect={() => setSettingsOpen(true)}>
               <IconSettings size={14} stroke={1.75} />
               {t('settings.title')}
+            </MenuItem>
+          )}
+
+          {/* Self-registration is closed: accounts only exist because an admin made them. */}
+          {isAdmin && (
+            <MenuItem onSelect={() => setUsersOpen(true)}>
+              <IconUsers size={14} stroke={1.75} />
+              {t('users.title')}
             </MenuItem>
           )}
 
@@ -159,28 +158,27 @@ function AuthedShell() {
       </header>
 
       <main className="min-h-0 flex-1">
-        {active ? (
+        {dataset.isLoading ? (
+          <div className="flex h-full items-center justify-center">
+            <span className="loading loading-spinner" />
+          </div>
+        ) : active ? (
           <Outlet />
         ) : (
-          <div className="flex h-full flex-col items-center justify-center gap-3 p-8 text-center">
+          /*
+            No call to action: connecting a model is an environment change plus a
+            restart, not something this screen can do.
+          */
+          <div className="flex h-full flex-col items-center justify-center gap-2 p-8 text-center">
             <p className="text-base-content/60 text-sm">{t('settings.noDataset')}</p>
-            {isAdmin && (
-              <button
-                type="button"
-                className="btn btn-primary btn-sm"
-                onClick={() => setSettingsOpen(true)}
-              >
-                <IconSettings size={14} stroke={1.75} />
-                {t('settings.connectFirst')}
-              </button>
-            )}
+            <p className="text-base-content/50 max-w-md text-xs">{t('settings.sourceHelp')}</p>
           </div>
         )}
       </main>
 
       {/*
-        Outside the `active` guard above: the settings dialog is how the first
-        model gets connected, so it has to be reachable when there is none.
+        Outside the `active` guard above: an admin must be able to open Settings
+        even when no model is connected, to see what the server is pointed at.
       */}
       <SettingsDialog
         open={settingsOpen}
@@ -188,6 +186,20 @@ function AuthedShell() {
         locale={locale}
         onClose={() => setSettingsOpen(false)}
       />
+
+      <AccountDialog
+        open={accountOpen}
+        email={me.data.email}
+        onClose={() => setAccountOpen(false)}
+      />
+
+      {isAdmin && (
+        <UsersDialog
+          open={usersOpen}
+          currentUserId={me.data.id}
+          onClose={() => setUsersOpen(false)}
+        />
+      )}
     </div>
   );
 }
