@@ -31,6 +31,20 @@ const NUMERIC_TYPES = new Set<number>([DATA_TYPE.int64, DATA_TYPE.double, DATA_T
 const NON_ADDITIVE_NAME =
   /cost|coste|price|precio|retail|pvp|tarifa|rate|tasa|ratio|pct|percent|porcentaje|margin|margen|avg|average|promedio|media|unit|unitario/i;
 
+/**
+ * Power BI's auto date/time tables. `IsHidden` cannot be trusted to mark them:
+ * the per-column `LocalDateTable_<guid>` copies do come back hidden, but the
+ * `DateTableTemplate_<guid>` they are stamped from reports `IsHidden = false`
+ * and so survived the visibility filter.
+ *
+ * Leaving it in the catalogue is not cosmetic. The template joins nothing and
+ * holds a single row, yet it offers the cleanest calendar columns in the model
+ * (`Año`, `Mes`, `Trimestre`), so the generator picked it over the real
+ * calendar - and a filter on an unrelated table is inert, which turns
+ * "kilos de marzo" into the grand total with no error anywhere.
+ */
+const ENGINE_TABLE_NAME = /^(?:DateTableTemplate|LocalDateTable)_/;
+
 /** The Spanish tokens the seed uses, because `schemaSection` prints them verbatim. */
 export function mapDataType(dataType: number): string {
   switch (dataType) {
@@ -62,6 +76,11 @@ export interface IntrospectedColumn {
   name: string;
   dataType: string;
   isAggregatable: boolean;
+  /**
+   * The sibling column this one is ordered by, when the model declares it.
+   * `null` leaves the ordering to be probed, or to stay unknown.
+   */
+  sortByColumn: string | null;
 }
 
 export interface IntrospectedTable {
@@ -161,6 +180,24 @@ export function inferIsAggregatable(
   return !NON_ADDITIVE_NAME.test(column.name);
 }
 
+/**
+ * The name behind a column's `SortByColumnID`, when it points somewhere real.
+ *
+ * Cross-table sort-by is not expressible in Tabular, so a target in another
+ * table means the ids drifted and the pointer is dropped rather than trusted.
+ */
+function resolveSortByColumn(
+  column: RawColumn,
+  columnsById: ReadonlyMap<number, RawColumn>,
+): string | null {
+  if (column.sortByColumnId === null) return null;
+
+  const target = columnsById.get(column.sortByColumnId);
+  if (!target || target.tableId !== column.tableId || target.id === column.id) return null;
+
+  return target.name;
+}
+
 /** Picks the column a `MIN`/`MAX` probe should read the model's date range from. */
 function pickDateColumn(
   tables: readonly RawTable[],
@@ -193,10 +230,20 @@ function pickDateColumn(
 export function buildModel(raw: RawModel): IntrospectedModel {
   const warnings: string[] = [];
 
-  const visibleTables = raw.tables.filter((table) => !table.isHidden);
-  const hiddenTables = raw.tables.length - visibleTables.length;
+  const engineTables = raw.tables.filter((table) => ENGINE_TABLE_NAME.test(table.name));
+  const candidateTables = raw.tables.filter((table) => !ENGINE_TABLE_NAME.test(table.name));
+
+  const visibleTables = candidateTables.filter((table) => !table.isHidden);
+  const hiddenTables = candidateTables.length - visibleTables.length;
   if (hiddenTables > 0) {
     warnings.push(`${hiddenTables} tabla(s) oculta(s) del modelo omitidas.`);
+  }
+  if (engineTables.length > 0) {
+    warnings.push(
+      `${engineTables.length} tabla(s) de fecha automática de Power BI omitidas: ${engineTables
+        .map((table) => table.name)
+        .join(', ')}.`,
+    );
   }
 
   const tableById = new Map(visibleTables.map((table) => [table.id, table]));
@@ -233,6 +280,27 @@ export function buildModel(raw: RawModel): IntrospectedModel {
     visibleTables.map((table) => [table.id, inferTableRole(table, columnsById, raw.relationships)]),
   );
 
+  /*
+   * An unjoined table cannot filter a measure: DAX evaluates the filter and the
+   * measure returns its grand total anyway. It is kept - a disconnected
+   * parameter table is a legitimate modelling choice - but the admin is told,
+   * because this is the shape that makes the generator produce silently wrong
+   * answers.
+   */
+  const joinedTableIds = new Set<number>();
+  for (const relationship of raw.relationships) {
+    joinedTableIds.add(relationship.fromTableId);
+    joinedTableIds.add(relationship.toTableId);
+  }
+  const orphans = visibleTables.filter((table) => !joinedTableIds.has(table.id));
+  if (orphans.length > 0) {
+    warnings.push(
+      `${orphans.length} tabla(s) sin ninguna relación: ${orphans
+        .map((table) => table.name)
+        .join(', ')}. Un filtro sobre ellas no afecta a ninguna medida.`,
+    );
+  }
+
   const tables: IntrospectedTable[] = visibleTables.map((table) => {
     const role = roles.get(table.id) ?? 'dimension';
 
@@ -244,6 +312,7 @@ export function buildModel(raw: RawModel): IntrospectedModel {
         name: column.name,
         dataType: mapDataType(column.dataType),
         isAggregatable: inferIsAggregatable(column, role, relationshipColumnIds),
+        sortByColumn: resolveSortByColumn(column, columnsById),
       })),
     };
   });

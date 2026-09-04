@@ -14,7 +14,7 @@ import {
   parseRelationships,
   parseTables,
 } from './info-queries.js';
-import { probeDateRange, probeSampleValues } from './probes.js';
+import { probeDateRange, probeSampleValues, probeSortOrders } from './probes.js';
 
 /**
  * Rediscovers a Power BI model and reconciles it into the catalogue.
@@ -91,6 +91,9 @@ export async function introspectDataset({
   const samples = await probeSampleValues(executor, connection, model.tables);
   warnings.push(...samples.warnings);
 
+  const sortOrders = await probeSortOrders(executor, connection, model.tables);
+  warnings.push(...sortOrders.warnings);
+
   let dateRange = { min: dataset.dateMin, max: dataset.dateMax };
   if (model.dateColumn) {
     const probed = await probeDateRange(executor, connection, model.dateColumn);
@@ -103,6 +106,7 @@ export async function introspectDataset({
     datasetId,
     model,
     samples: samples.value ?? new Map(),
+    sortOrders: sortOrders.value ?? new Map(),
     dateRange,
   });
 
@@ -120,6 +124,7 @@ interface WriteOptions {
   datasetId: string;
   model: IntrospectedModel;
   samples: Map<string, Map<string, string | null>>;
+  sortOrders: Map<string, Map<string, string[]>>;
   dateRange: { min: string; max: string };
 }
 
@@ -133,6 +138,7 @@ async function write({
   datasetId,
   model,
   samples,
+  sortOrders,
   dateRange,
 }: WriteOptions): Promise<WriteResult> {
   const tableCounts = counts();
@@ -206,10 +212,17 @@ async function write({
         .where(eq(schema.datasetColumns.tableId, tableId));
 
       const tableSamples = samples.get(table.name);
+      const tableOrders = sortOrders.get(table.name);
 
       for (const column of table.columns) {
         const existing = existingColumns.find((row) => row.name === column.name);
         const sampleValue = tableSamples?.get(column.name) ?? null;
+        /*
+         * Written on every sync, null included: an order that no longer holds -
+         * the sort-by was removed, or the pairing stopped being one-to-one - has
+         * to disappear rather than linger as a stale axis.
+         */
+        const sortOrder = tableOrders?.get(column.name) ?? null;
 
         if (existing) {
           /*
@@ -223,6 +236,7 @@ async function write({
               dataType: column.dataType,
               isAggregatable: column.isAggregatable,
               sampleValue: sampleValue ?? existing.sampleValue,
+              sortOrder,
             })
             .where(eq(schema.datasetColumns.id, existing.id));
 
@@ -236,6 +250,7 @@ async function write({
           dataType: column.dataType,
           isAggregatable: column.isAggregatable,
           sampleValue,
+          sortOrder,
         });
         columnCounts.created += 1;
       }

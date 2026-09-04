@@ -31,6 +31,7 @@ function toSummary(
     description: dataset.description,
     extraContext: dataset.extraContext,
     extraContextGeneratedAt: dataset.extraContextGeneratedAt?.toISOString() ?? null,
+    starters: dataset.starters,
     source: { workspaceName: dataset.workspaceName, datasetName: dataset.datasetName },
     dateRange: { min: dataset.dateMin, max: dataset.dateMax },
     tableCount: counts.tables,

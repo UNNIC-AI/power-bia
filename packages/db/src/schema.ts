@@ -70,6 +70,14 @@ export const datasets = pgTable('datasets', {
    * their own text, so the UI never labels a human's words as generated.
    */
   extraContextGeneratedAt: timestamp('extra_context_generated_at', { withTimezone: true }),
+  /**
+   * Example questions for the empty chat, written from the catalogue at the
+   * same time as `extraContext`. They used to be three hardcoded strings in the
+   * web bundle, which meant every deployment suggested the same questions no
+   * matter which model `PBI_*` pointed at. Unlike `extraContext` these are not
+   * curated, so regenerating the context replaces them.
+   */
+  starters: jsonb('starters').$type<string[]>().notNull().default([]),
   lastIntrospectedAt: timestamp('last_introspected_at', { withTimezone: true }),
   createdAt,
 });
@@ -103,6 +111,12 @@ export const datasetColumns = pgTable(
     dataType: text('data_type').notNull(),
     sampleValue: text('sample_value'),
     isAggregatable: boolean('is_aggregatable').notNull().default(false),
+    /**
+     * The column's values in their canonical order, when they have one that is
+     * not alphabetical - month names being the case that matters. Discovered,
+     * never authored: see `datasets/probes.ts`. Null means "sort as usual".
+     */
+    sortOrder: jsonb('sort_order').$type<string[]>(),
     note: text('note'),
     labels: jsonb('labels').$type<LocalizedLabel>().notNull().default({}),
   },

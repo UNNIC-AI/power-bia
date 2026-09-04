@@ -10,6 +10,8 @@ export const datasetColumnSchema = z.object({
   dataType: z.string(),
   sampleValue: z.union([z.string(), z.number(), z.null()]),
   isAggregatable: z.boolean(),
+  /** Canonical value order, when the column has one that is not alphabetical. */
+  sortOrder: z.array(z.string()).nullable(),
   /** Curated guidance handed to the LLM, e.g. "never ORDER BY this in a monthly grouping". */
   note: z.string().nullable(),
   labels: localizedLabelSchema,
@@ -73,6 +75,8 @@ export const datasetSummarySchema = z.object({
   extraContext: z.string(),
   /** When the model last wrote `extraContext` itself; null once an admin edits it. */
   extraContextGeneratedAt: z.iso.datetime().nullable(),
+  /** Example questions written from this model's catalogue. Empty before the first sync. */
+  starters: z.array(z.string()),
   source: datasetSourceSchema,
   dateRange: z.object({ min: z.iso.date(), max: z.iso.date() }),
   tableCount: z.number().int(),
@@ -97,6 +101,8 @@ export const datasetSettingsInputSchema = z.object({
 export const generatedDatasetContextSchema = z.object({
   description: z.string(),
   extraContext: z.string(),
+  /** Three questions this model can actually answer, for the empty chat. */
+  starters: z.array(z.string()).length(3),
 });
 
 const reconcileCountSchema = z.object({

@@ -1,0 +1,1 @@
+ALTER TABLE "dataset_columns" ADD COLUMN "sort_order" jsonb;

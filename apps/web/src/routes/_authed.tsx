@@ -12,7 +12,7 @@ import {
   IconUsers,
 } from '@tabler/icons-react';
 import { createFileRoute, Outlet, useNavigate } from '@tanstack/react-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AccountDialog } from '../components/AccountDialog.tsx';
 import { Menu, MenuItem, MenuSeparator } from '../components/Menu.tsx';
@@ -33,6 +33,18 @@ export const Route = createFileRoute('/_authed')({ component: AuthedLayout });
 function AuthedLayout() {
   const navigate = useNavigate();
   const me = useMe();
+  const signedOut = !me.isLoading && !me.data;
+
+  /*
+   * In an effect, not in the render body: navigating while rendering updates
+   * the router from inside another component's render, which React reports as
+   * "Cannot update a component while rendering a different component" on every
+   * load. `beforeLoad` is the usual home for this, but the session lives in a
+   * query rather than in the router's context.
+   */
+  useEffect(() => {
+    if (signedOut) void navigate({ to: '/login' });
+  }, [signedOut, navigate]);
 
   if (me.isLoading) {
     return (
@@ -42,10 +54,7 @@ function AuthedLayout() {
     );
   }
 
-  if (!me.data) {
-    void navigate({ to: '/login' });
-    return null;
-  }
+  if (!me.data) return null;
 
   return <AuthedShell />;
 }

@@ -3,12 +3,13 @@ import type { Card, CardPart, Locale, Message } from '@powerbia/contracts';
 import { IconPin } from '@tabler/icons-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { DefaultChatTransport, type UIMessage } from 'ai';
-import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { keys } from '../../lib/queries.ts';
 import { CardPanel } from '../cards/CardView.tsx';
+import { Menu, MenuItem } from '../Menu.tsx';
 import { Prompt } from '../Prompt.tsx';
-import { Tooltip } from '../Tooltip.tsx';
+import { Toast } from '../Toast.tsx';
 import { DaxViewer } from './DaxViewer.tsx';
 
 export type ChatUIMessage = UIMessage<
@@ -48,12 +49,21 @@ function toUIMessages(messages: readonly Message[]): ChatUIMessage[] {
   });
 }
 
+export interface PinTarget {
+  id: string;
+  name: string;
+}
+
 interface Props {
   locale: Locale;
   conversationId: string | null;
   history: readonly Message[];
   onConversationCreated: (id: string) => void;
-  onPin?: (card: Card, query: string, dax: string | null) => void;
+  /** Example questions written from the connected model. Empty falls back to i18n. */
+  modelStarters?: readonly string[];
+  /** The views a card can be pinned to. Empty hides the pin button entirely. */
+  pinTargets?: readonly PinTarget[];
+  onPin?: (dashboardId: string, card: Card, query: string, dax: string | null) => unknown;
 }
 
 export function ChatPanel({
@@ -61,11 +71,14 @@ export function ChatPanel({
   conversationId,
   history,
   onConversationCreated,
+  modelStarters = [],
+  pinTargets = [],
   onPin,
 }: Props) {
   const { t } = useTranslation();
   const client = useQueryClient();
   const bottom = useRef<HTMLDivElement>(null);
+  const [pinned, setPinned] = useState<{ text: string; failed: boolean } | null>(null);
 
   const initialMessages = useMemo(() => toUIMessages(history), [history]);
 
@@ -146,7 +159,31 @@ export function ChatPanel({
     [busy, sendMessage],
   );
 
-  const starters = t('chat.starters', { returnObjects: true }) as string[];
+  const pin = useCallback(
+    async (target: PinTarget, payload: CardPart, messageId: string) => {
+      if (!onPin || !payload.card) return;
+
+      try {
+        await onPin(target.id, payload.card, questionFor.get(messageId) ?? '', payload.dax);
+        setPinned({ text: t('chat.pinnedTo', { name: target.name }), failed: false });
+      } catch {
+        // The request is the only thing that can fail here, and it says nothing
+        // the reader can act on. What matters is that it did not work.
+        setPinned({ text: t('chat.pinFailed'), failed: true });
+      }
+    },
+    [onPin, questionFor, t],
+  );
+
+  /*
+   * The model's own suggestions, written from its catalogue. The i18n list is
+   * only a fallback for a deployment whose model has not been synced since the
+   * starters were added - it cannot know what this model measures.
+   */
+  const starters =
+    modelStarters.length > 0
+      ? modelStarters
+      : (t('chat.starters', { returnObjects: true }) as string[]);
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -197,20 +234,29 @@ export function ChatPanel({
                     locale={locale}
                     onChoice={(_id, label) => send(label)}
                     actions={
-                      onPin && payload.card.kind !== 'choice' ? (
-                        <Tooltip label={t('chat.pinToDashboard')}>
-                          <button
-                            type="button"
-                            className="btn btn-ghost btn-square btn-xs"
-                            aria-label={t('chat.pinToDashboard')}
-                            onClick={() => {
-                              if (payload.card)
-                                onPin(payload.card, questionFor.get(message.id) ?? '', payload.dax);
-                            }}
-                          >
-                            <IconPin size={16} stroke={1.75} />
-                          </button>
-                        </Tooltip>
+                      onPin && pinTargets.length > 0 && payload.card.kind !== 'choice' ? (
+                        <Menu
+                          label={t('chat.pinToDashboard')}
+                          header={t('chat.pinToDashboard')}
+                          trigger={
+                            <button
+                              type="button"
+                              className="btn btn-ghost btn-square btn-xs"
+                              aria-label={t('chat.pinToDashboard')}
+                            >
+                              <IconPin size={16} stroke={1.75} />
+                            </button>
+                          }
+                        >
+                          {pinTargets.map((target) => (
+                            <MenuItem
+                              key={target.id}
+                              onSelect={() => void pin(target, payload, message.id)}
+                            >
+                              {target.name}
+                            </MenuItem>
+                          ))}
+                        </Menu>
                       ) : undefined
                     }
                   />
@@ -239,6 +285,10 @@ export function ChatPanel({
       </div>
 
       <Prompt onSubmit={send} busy={busy} label={t('chat.send')} />
+
+      {pinned && (
+        <Toast message={pinned.text} failed={pinned.failed} onDismiss={() => setPinned(null)} />
+      )}
     </div>
   );
 }

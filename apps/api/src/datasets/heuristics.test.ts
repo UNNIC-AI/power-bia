@@ -34,6 +34,8 @@ const TABLES = result(
     [3, 1, 'Items', null, false, null],
     [4, 1, 'Stores', null, false, null],
     [5, 1, 'LocalDateTable_x', null, true, null],
+    // The template the LocalDateTables are stamped from. Power BI reports it visible.
+    [6, 1, 'DateTableTemplate_x', null, false, null],
   ],
 );
 
@@ -49,13 +51,15 @@ const COLUMNS = result(
     '[IsKey]',
     '[SummarizeBy]',
     '[Type]',
+    '[SortByColumnID]',
   ],
   [
     // Calendar
-    [10, 1, 'Date', 'Date', DATA_TYPE.dateTime, 0, false, true, SUMMARIZE_BY.none, 1],
-    [11, 1, 'FechaSK', 'FechaSK', DATA_TYPE.int64, 0, false, false, SUMMARIZE_BY.default, 1],
-    [12, 1, '#Año', '#Año', DATA_TYPE.int64, 0, false, false, SUMMARIZE_BY.default, 1],
-    [13, 1, 'Mes', 'Mes', DATA_TYPE.string, 0, false, false, SUMMARIZE_BY.none, 1],
+    [10, 1, 'Date', 'Date', DATA_TYPE.dateTime, 0, false, true, SUMMARIZE_BY.none, 1, null],
+    [11, 1, 'FechaSK', 'FechaSK', DATA_TYPE.int64, 0, false, false, SUMMARIZE_BY.default, 1, null],
+    [12, 1, '#Año', '#Año', DATA_TYPE.int64, 0, false, false, SUMMARIZE_BY.default, 1, null],
+    // Sorted by FechaSK: the model's own statement that "enero" precedes "febrero".
+    [13, 1, 'Mes', 'Mes', DATA_TYPE.string, 0, false, false, SUMMARIZE_BY.none, 1, 11],
     // Invoices
     [20, 2, 'Date', 'Date', DATA_TYPE.dateTime, 0, false, false, SUMMARIZE_BY.none, 1],
     [21, 2, 'Item Number', 'Item Number', DATA_TYPE.string, 0, false, false, SUMMARIZE_BY.none, 1],
@@ -211,6 +215,14 @@ describe('buildModel on the Iowa model', () => {
     expect(aggregatable).toEqual([]);
   });
 
+  it('resolves a declared SortByColumn to its name, and reports none otherwise', () => {
+    const calendar = iowa().tables.find((table) => table.name === 'Calendar');
+    const byName = new Map(calendar?.columns.map((column) => [column.name, column]));
+
+    expect(byName.get('Mes')?.sortByColumn).toBe('FechaSK');
+    expect(byName.get('#Año')?.sortByColumn).toBeNull();
+  });
+
   it('drops engine artefacts, hidden columns and hidden tables', () => {
     const model = iowa();
     const names = model.tables.flatMap((table) =>
@@ -218,6 +230,7 @@ describe('buildModel on the Iowa model', () => {
     );
 
     expect(model.tables.map((table) => table.name)).not.toContain('LocalDateTable_x');
+    expect(model.tables.map((table) => table.name)).not.toContain('DateTableTemplate_x');
     expect(names.some((name) => name.includes('RowNumber'))).toBe(false);
     expect(names).not.toContain('Stores[Internal Flag]');
     expect(names).toContain('Stores[Store Number]');
@@ -282,6 +295,7 @@ describe('inferIsAggregatable', () => {
     isKey: false,
     summarizeBy: SUMMARIZE_BY.default,
     columnType: COLUMN_TYPE.data,
+    sortByColumnId: null,
   };
 
   it('accepts a plain numeric measure column', () => {

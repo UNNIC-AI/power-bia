@@ -37,9 +37,15 @@ const AXIS_PROPS = {
   tickLine: false,
 } as const;
 
-const MAX_TICK_CHARS = 16;
+const MAX_TICK_CHARS = 24;
+/** Enough band for an angled label of `MAX_TICK_CHARS` at the axis font size. */
+const ANGLED_AXIS_HEIGHT = 132;
 
-/** An angled label longer than this runs off the left edge of the plot. */
+/**
+ * An angled label longer than this runs off the left edge of the plot. Names
+ * are what gets cut - "MIGUEL ANGEL NA..." - so the limit is as generous as the
+ * reserved band allows; the tooltip carries the full text either way.
+ */
 function truncateTick(value: string): string {
   return value.length > MAX_TICK_CHARS ? `${value.slice(0, MAX_TICK_CHARS - 1)}...` : value;
 }
@@ -56,7 +62,7 @@ export function ChartAxes({ locale, angleLabels }: { locale: Locale; angleLabels
           ? {
               angle: -35,
               textAnchor: 'end' as const,
-              height: 96,
+              height: ANGLED_AXIS_HEIGHT,
               tickFormatter: truncateTick,
             }
           : {})}

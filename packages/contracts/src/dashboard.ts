@@ -41,7 +41,13 @@ export const createWidgetSchema = z.object({
   card: cardSchema,
   query: z.string().nullable().default(null),
   dax: z.string().nullable().default(null),
-  layout: widgetLayoutSchema,
+  /*
+   * Optional because only a caller looking at the dashboard knows where there
+   * is room. Pinning from the chat does not, and guessing `{x: 0, y: 0}` put
+   * the new card on top of whatever was already there - so when this is absent
+   * the server appends below the last widget instead.
+   */
+  layout: widgetLayoutSchema.optional(),
 });
 
 export const updateWidgetSchema = z.object({

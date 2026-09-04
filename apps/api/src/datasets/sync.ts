@@ -52,10 +52,41 @@ export async function generateDatasetContext(options: {
       ...(generated.description === '' ? {} : { description: generated.description }),
       extraContext: generated.extraContext,
       extraContextGeneratedAt: generatedAt,
+      /*
+       * Unlike the prose, the starters are nobody's to curate - they are the
+       * empty chat's example questions - so they are simply replaced.
+       */
+      starters: generated.starters,
     })
     .where(eq(schema.datasets.id, datasetId));
 
   return { ...generated, generatedAt: generatedAt.toISOString() };
+}
+
+/**
+ * Writes the empty-chat starters and nothing else.
+ *
+ * A model connected before the starters existed has curated prose, so
+ * `generateDatasetContext` must not run on it - that would replace the admin's
+ * words to fill in three example questions. This asks the same stage and keeps
+ * only the part nobody has edited.
+ */
+async function backfillStarters(options: {
+  db: Database;
+  datasetId: string;
+  locale?: Locale | undefined;
+}): Promise<void> {
+  const { db, datasetId, locale = env.MODEL_CONTEXT_LOCALE } = options;
+
+  const dataset = await loadDatasetContext(db, datasetId);
+  if (!dataset || dataset.tables.length === 0) return;
+
+  const generated = await describeModel({ dataset, locale });
+
+  await db
+    .update(schema.datasets)
+    .set({ starters: generated.starters })
+    .where(eq(schema.datasets.id, datasetId));
 }
 
 export interface SyncOptions {
@@ -85,7 +116,18 @@ export async function syncDataset({
   const dataset = await db.query.datasets.findFirst({
     where: eq(schema.datasets.id, datasetId),
   });
-  if (dataset && dataset.extraContext.trim() !== '') return { ...report, contextGenerated: false };
+  if (dataset && dataset.extraContext.trim() !== '') {
+    // Documented already, but possibly from before the starters existed.
+    if (dataset.starters.length === 0) {
+      try {
+        await backfillStarters({ db, datasetId, locale });
+      } catch (cause) {
+        log?.warn({ cause, datasetId }, 'could not write the chat starters');
+      }
+    }
+
+    return { ...report, contextGenerated: false };
+  }
 
   try {
     await generateDatasetContext({ db, datasetId, locale });

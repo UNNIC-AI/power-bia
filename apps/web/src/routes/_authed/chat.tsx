@@ -1,5 +1,4 @@
 import type { Card } from '@powerbia/contracts';
-import { DEFAULT_WIDGET_SIZE } from '@powerbia/contracts';
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -9,12 +8,12 @@ import { Sidebar } from '../../components/Sidebar.tsx';
 
 import { formatDay } from '../../lib/format.ts';
 import {
-  useAddWidget,
   useConversation,
   useConversations,
   useDashboards,
   useDataset,
   useDeleteConversation,
+  usePinToDashboard,
   useRegenerateConversationTitle,
   useRenameConversation,
 } from '../../lib/queries.ts';
@@ -49,9 +48,7 @@ function ChatRoute() {
   const regenerateTitle = useRegenerateConversationTitle();
   const deleteConversation = useDeleteConversation();
   const dashboards = useDashboards();
-
-  const firstDashboard = dashboards.data?.[0];
-  const addWidget = useAddWidget(firstDashboard?.id ?? '');
+  const pinToDashboard = usePinToDashboard();
 
   /*
    * The panel is remounted to replay a different conversation's history, which
@@ -115,17 +112,9 @@ function ChatRoute() {
     setPendingDelete(null);
   };
 
-  const pin = (card: Card, query: string, dax: string | null) => {
-    if (!firstDashboard) return;
-    const size = DEFAULT_WIDGET_SIZE[card.kind];
-
-    void addWidget.mutateAsync({
-      card,
-      query: query || null,
-      dax,
-      layout: { x: 0, y: 0, width: size.width, height: size.height },
-    });
-  };
+  /** The layout is the server's: only it knows where the target view has room. */
+  const pin = (dashboardId: string, card: Card, query: string, dax: string | null) =>
+    pinToDashboard.mutateAsync({ dashboardId, card, query: query || null, dax });
 
   return (
     <div className="flex h-full min-h-0">
@@ -166,7 +155,9 @@ function ChatRoute() {
             conversationId={conversationId ?? null}
             history={conversation.data?.messages ?? []}
             onConversationCreated={adopt}
-            {...(firstDashboard ? { onPin: pin } : {})}
+            modelStarters={dataset.data.starters}
+            pinTargets={dashboards.data ?? []}
+            onPin={pin}
           />
         )}
       </section>

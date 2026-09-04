@@ -357,7 +357,7 @@ Reglas:
 
 export const DESCRIBER_ROLE = `Tu tarea: documentar este modelo de datos para que el resto del pipeline pueda usarlo.
 
-Devuelves dos textos:
+Devuelves dos textos y una lista:
 
   "description": UNA frase (máx. 200 caracteres) que diga qué mide el modelo y cuál es el
   grano de su tabla de hechos. Ej.: "Ventas mayoristas de licor: cada fila es un producto
@@ -375,6 +375,12 @@ Devuelves dos textos:
        subrogadas que no sirven para agrupar ni ordenar, columnas casi duplicadas y cuál es
        la correcta, y la columna adecuada para ordenar cronológicamente.
 
+  "starters": EXACTAMENTE tres preguntas de ejemplo que este modelo pueda responder de
+  verdad, tal y como las escribiría un usuario de negocio: en lenguaje natural, sin nombres
+  de tabla, de columna ni de medida. Una por cada forma distinta de mirar el modelo: un
+  total, una evolución en el tiempo y un ranking por alguna dimensión. Máx. 80 caracteres
+  cada una.
+
 Reglas ineludibles:
   - Usa SOLO lo que aparece en el esquema, en los valores de ejemplo y en el vocabulario de
     medidas. Si algo no se puede deducir, NO lo inventes: dilo o no lo menciones.
@@ -385,7 +391,9 @@ Reglas ineludibles:
   - No repitas el esquema columna a columna: explica lo que el esquema no dice por sí solo.
   - Si recibes una versión anterior de este texto, conserva todo lo que siga siendo cierto
     para el esquema actual — es conocimiento que aportó una persona — y elimina o corrige
-    solo lo que ya no encaje.`;
+    solo lo que ya no encaje.
+  - Las tres preguntas de "starters" no pueden pedir periodos, entidades ni magnitudes que
+    el esquema no contenga: es lo primero que verá el usuario y tiene que funcionar.`;
 
 /**
  * The instructions for writing a model's own context. It gets the schema and
@@ -402,7 +410,7 @@ export function buildDescriberInstructions(options: {
   return [
     systemContext(dataset, locale),
     schemaSection(dataset),
-    `Redacta ambos textos en ${LANGUAGE[locale]}.`,
+    `Redacta los textos y las preguntas en ${LANGUAGE[locale]}.`,
     DESCRIBER_ROLE,
   ].join('\n\n');
 }

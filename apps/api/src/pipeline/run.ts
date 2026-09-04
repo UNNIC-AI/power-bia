@@ -7,8 +7,8 @@ import type {
   VizDecision,
 } from '@powerbia/contracts';
 import { buildCard } from '../cards/build.js';
-import type { ResultTable } from '../cards/table.js';
-import { createLabelResolver } from '../datasets/context.js';
+import { columnValues, isNumericColumn, type ResultTable } from '../cards/table.js';
+import { createLabelResolver, createOrderResolver } from '../datasets/context.js';
 import type { DaxExecutor, PowerBiConnection } from '../dax/executor.js';
 import { applyFilters } from '../dax/filters.js';
 import type { HistoryEntry } from './stages.js';
@@ -72,6 +72,28 @@ function applyForcedChartType(decision: VizDecision, forced: ChartType | null): 
   if (!forced) return decision;
 
   return { ...decision, chartType: forced, mode: forced === 'table' ? 'table' : 'chart' };
+}
+
+/**
+ * Numeric columns that came back empty for every row.
+ *
+ * A measure guarded by `ISINSCOPE` returns BLANK unless the query groups by one
+ * of the columns it names, and a filter on a table that joins nothing is simply
+ * ignored. Both produce a well-formed query, a result Power BI is happy with,
+ * and a number that means nothing - which the writer then narrates as a finding
+ * ("no hubo tiempo productivo") rather than as the empty result it is. Naming
+ * them lets it hedge instead.
+ */
+function blankMeasureColumns(table: ResultTable): string[] {
+  return table.columns.filter((column) => {
+    const values = columnValues(table, column);
+    if (values.length === 0) return false;
+
+    // All BLANK is the ISINSCOPE case; all zero is the inert-filter case.
+    if (values.every((value) => value === null)) return true;
+
+    return isNumericColumn(table, column) && values.every((value) => value === null || value === 0);
+  });
 }
 
 function toClarification(decision: VizDecision, locale: Locale): PipelineOutput {
@@ -175,6 +197,7 @@ async function answerQuery(input: PipelineInput, decision: VizDecision): Promise
     ? buildCard(table, decision, {
         locale,
         labelFor: createLabelResolver(dataset, locale),
+        orderFor: createOrderResolver(dataset),
         title: decision.suggestedTitle || null,
       })
     : null;
@@ -189,6 +212,7 @@ async function answerQuery(input: PipelineInput, decision: VizDecision): Promise
       text,
       result: table,
       error: outcome.ok ? null : outcome.error,
+      blankColumns: table ? blankMeasureColumns(table) : [],
       decision,
       dataset,
       locale,

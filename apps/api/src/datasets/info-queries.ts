@@ -59,6 +59,12 @@ export interface RawColumn {
   isKey: boolean;
   summarizeBy: number;
   columnType: number;
+  /**
+   * The column this one is ordered by, when the model says so - Power BI's
+   * Sort-By-Column. It is the only model-agnostic statement that "enero" comes
+   * before "febrero"; without it a month name sorts alphabetically.
+   */
+  sortByColumnId: number | null;
 }
 
 export interface RawMeasure {
@@ -123,6 +129,18 @@ function readInt(row: Row, index: Map<string, number>, field: string, fallback: 
 }
 
 /** ADOMD reports booleans as booleans, but Power BI versions differ on `1` / `"True"`. */
+/** Like `readInt`, but a missing or blank field means "not set" rather than a default. */
+function readOptionalInt(row: Row, index: Map<string, number>, field: string): number | null {
+  const value = cell(row, index, field);
+  if (typeof value === 'number') return value;
+  if (typeof value === 'string' && value.trim() !== '') {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+
+  return null;
+}
+
 function readBool(row: Row, index: Map<string, number>, field: string): boolean {
   const value = cell(row, index, field);
   if (typeof value === 'boolean') return value;
@@ -173,6 +191,7 @@ export function parseColumns(result: DaxResult): RawColumn[] {
         isKey: readBool(row, index, 'IsKey'),
         summarizeBy: readInt(row, index, 'SummarizeBy', SUMMARIZE_BY.default),
         columnType: readInt(row, index, 'Type', COLUMN_TYPE.data),
+        sortByColumnId: readOptionalInt(row, index, 'SortByColumnID'),
       };
     })
     .filter(

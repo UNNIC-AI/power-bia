@@ -36,6 +36,20 @@
       "when": 1788441828298,
       "tag": "0004_marvelous_paibok",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1788514344535,
+      "tag": "0005_equal_thing",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1788515618160,
+      "tag": "0006_legal_raider",
+      "breakpoints": true
     }
   ]
 }

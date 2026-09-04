@@ -11,6 +11,7 @@ import {
   toPoints,
 } from './reduce.js';
 import {
+  type Cell,
   categoricalColumns,
   cellAt,
   isEmpty,
@@ -23,6 +24,8 @@ import {
 export interface CardContext {
   locale: Locale;
   labelFor: (column: string) => string;
+  /** Canonical value order for a column, when the catalogue discovered one. */
+  orderFor?: (column: string) => readonly string[] | null;
   title: string | null;
 }
 
@@ -51,6 +54,40 @@ function hasAnyValue(series: readonly Series[]): boolean {
 }
 
 /**
+ * Puts the rows in the order the catalogue says the axis runs in.
+ *
+ * Everything downstream reads row order as meaningful - a line chart draws it,
+ * a table prints it, and `limitTemporalPoints` takes the last N as "the most
+ * recent". So sorting here is what makes a month axis chronological, rather
+ * than each of those places having to know about it. The generated DAX cannot
+ * do this itself: ordering by the month number means projecting it, which puts
+ * a column nobody asked for in the result.
+ *
+ * Rows whose label is not in the order keep their relative position at the end,
+ * so a partial or unexpected value degrades to "unsorted" and never disappears.
+ */
+function applyCanonicalOrder(table: ResultTable, ctx: CardContext): ResultTable {
+  if (!ctx.orderFor) return table;
+
+  for (const [index, column] of table.columns.entries()) {
+    const order = ctx.orderFor(column);
+    if (!order) continue;
+
+    const position = new Map(order.map((value, at) => [value, at]));
+    const rank = (row: Cell[]) => position.get(String(row[index] ?? '')) ?? order.length;
+
+    const sorted = table.rows
+      .map((row, at) => ({ row, at }))
+      .sort((a, b) => rank(a.row) - rank(b.row) || a.at - b.at)
+      .map((entry) => entry.row);
+
+    return { columns: table.columns, rows: sorted };
+  }
+
+  return table;
+}
+
+/**
  * Turns a result set into a card using the visualization decided before the DAX
  * was generated. Where the returned data cannot support that decision, it
  * degrades deterministically rather than rendering something broken:
@@ -59,12 +96,13 @@ function hasAnyValue(series: readonly Series[]): boolean {
  * becomes a table.
  */
 export function buildCard(
-  table: ResultTable,
+  source: ResultTable,
   decision: VizDecision,
   ctx: CardContext,
 ): Card | null {
-  if (isEmpty(table)) return null;
+  if (isEmpty(source)) return null;
 
+  const table = applyCanonicalOrder(source, ctx);
   const { locale } = ctx;
   const categorical = categoricalColumns(table);
   const numeric = numericColumns(table);

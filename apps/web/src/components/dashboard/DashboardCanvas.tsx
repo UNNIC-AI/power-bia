@@ -6,7 +6,6 @@ import type {
   Locale,
   Widget,
 } from '@powerbia/contracts';
-import { DEFAULT_WIDGET_SIZE } from '@powerbia/contracts';
 import {
   IconDots,
   IconLock,
@@ -348,17 +347,11 @@ export function DashboardCanvas({ dashboard, locale }: Props) {
       subtitle: null,
       text: result.text || '-',
     };
-    const size = DEFAULT_WIDGET_SIZE[card.kind];
-    const nextY = widgets.reduce(
-      (lowest, widget) => Math.max(lowest, widget.layout.y + widget.layout.height),
-      0,
-    );
-
+    // No layout: the server appends below the last widget. See `appendPosition`.
     await addWidget.mutateAsync({
       card,
       query: result.card ? text : null,
       dax: result.card ? result.dax : null,
-      layout: { x: 0, y: nextY, width: size.width, height: size.height },
     });
   };
 

@@ -19,6 +19,7 @@ const dataset: DatasetContext = {
           dataType: 'decimal',
           sampleValue: '12.5',
           isAggregatable: true,
+          sortOrder: null,
           note: null,
           labels: {},
         },

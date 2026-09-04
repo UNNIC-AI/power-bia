@@ -36,6 +36,7 @@ export async function loadDatasetContext(
         dataType: column.dataType,
         sampleValue: column.sampleValue,
         isAggregatable: column.isAggregatable,
+        sortOrder: column.sortOrder,
         note: column.note,
         labels: column.labels,
       })),
@@ -74,6 +75,29 @@ export async function loadConnection(
  * Column headings for the UI. Replaces the MVP's hardcoded Spanish dictionary of
  * Iowa-specific column names with the per-dataset curated labels.
  */
+/**
+ * The canonical order of a result column's values, for the columns that have
+ * one. Built like `createLabelResolver` and read the same way: the card builder
+ * knows a column name, not which table it came from.
+ */
+export function createOrderResolver(
+  dataset: DatasetContext,
+): (column: string) => readonly string[] | null {
+  const orders = new Map<string, readonly string[]>();
+
+  for (const table of dataset.tables) {
+    for (const column of table.columns) {
+      if (column.sortOrder && column.sortOrder.length > 0) {
+        orders.set(column.name.toLowerCase(), column.sortOrder);
+      }
+    }
+  }
+
+  if (orders.size === 0) return () => null;
+
+  return (column) => orders.get(normalizeColumnName(column).trim().toLowerCase()) ?? null;
+}
+
 export function createLabelResolver(
   dataset: DatasetContext,
   locale: Locale,

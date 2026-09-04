@@ -102,6 +102,20 @@ export async function chatRoutes(app: FastifyInstance) {
           data: { card: outcome.card, dax: outcome.dax, followUps: [] },
         });
 
+        /*
+         * A branch that answers without calling the writer model - a
+         * clarification, an out-of-range period, a filter card's confirmation -
+         * returns its prose in `text` and no stream. It was persisted but never
+         * put on the wire, so every "I cannot answer that" rendered as an empty
+         * assistant turn that only appeared after a reload. `text` and `stream`
+         * are mutually exclusive in `runPipeline`, so this never doubles up.
+         */
+        if (outcome.text) {
+          writer.write({ type: 'text-start', id: 'answer' });
+          writer.write({ type: 'text-delta', id: 'answer', delta: outcome.text });
+          writer.write({ type: 'text-end', id: 'answer' });
+        }
+
         if (outcome.stream) writer.merge(toUIMessageStream({ stream: outcome.stream.stream }));
 
         const answer = outcome.text ?? (await readStreamText(outcome.stream));

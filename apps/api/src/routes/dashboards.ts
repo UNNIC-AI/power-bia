@@ -1,6 +1,8 @@
 import {
+  type Card,
   createDashboardSchema,
   createWidgetSchema,
+  DEFAULT_WIDGET_SIZE,
   dashboardSchema,
   dashboardSummarySchema,
   errorSchema,
@@ -42,6 +44,22 @@ export async function dashboardRoutes(app: FastifyInstance) {
     return app.db.query.dashboards.findFirst({
       where: and(eq(schema.dashboards.id, dashboardId), eq(schema.dashboards.userId, userId)),
     });
+  }
+
+  /**
+   * A free row below everything already on the dashboard, at the card's default
+   * size. The grid packs upwards on its own, so this only has to be clear - it
+   * does not have to be tight.
+   */
+  async function appendPosition(dashboardId: string, card: Card) {
+    const existing = await app.db.query.widgets.findMany({
+      where: eq(schema.widgets.dashboardId, dashboardId),
+      columns: { y: true, height: true },
+    });
+
+    const y = existing.reduce((lowest, widget) => Math.max(lowest, widget.y + widget.height), 0);
+
+    return { x: 0, y, ...DEFAULT_WIDGET_SIZE[card.kind] };
   }
 
   route.get(
@@ -210,9 +228,11 @@ export async function dashboardRoutes(app: FastifyInstance) {
       }
 
       const { card, query, dax, layout } = request.body;
+      const placement = layout ?? (await appendPosition(request.params.id, card));
+
       const [widget] = await app.db
         .insert(schema.widgets)
-        .values({ dashboardId: request.params.id, card, query, dax, ...layout })
+        .values({ dashboardId: request.params.id, card, query, dax, ...placement })
         .returning();
       if (!widget) return reply.code(500).send({ message: 'Could not create widget' });
 

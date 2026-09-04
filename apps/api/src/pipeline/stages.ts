@@ -215,6 +215,18 @@ Genera el DAX corregido.`,
 
 const MAX_CONTEXT_ROWS = 50;
 
+/**
+ * What to tell the writer about columns that came back empty for every row.
+ * Without it the prose reports "no hubo tiempo productivo" as a fact about the
+ * factory, when what actually happened is that the query grouped by a column
+ * the measure does not respond to.
+ */
+function describeBlankColumns(columns: readonly string[]): string {
+  if (columns.length === 0) return '';
+
+  return `\n\nAviso: estas columnas no han devuelto ningún valor en ninguna fila: ${columns.join(', ')}. Eso suele significar que la agrupación o el filtro elegidos no aplican a esa medida, no que el negocio no tenga actividad. No afirmes que el valor es cero: di que la medida no ha devuelto datos para esta agrupación y sugiere agrupar de otra forma.`;
+}
+
 function describeResult(
   result: { columns: string[]; rows: unknown[][] } | null,
   error: string | null,
@@ -243,11 +255,13 @@ export function answerData(options: {
   text: string;
   result: { columns: string[]; rows: unknown[][] } | null;
   error: string | null;
+  /** Columns that came back empty for every row. See `describeBlankColumns`. */
+  blankColumns?: readonly string[];
   decision: VizDecision | null;
   dataset: DatasetContext;
   locale: Locale;
 }) {
-  const { text, result, error, decision, dataset, locale } = options;
+  const { text, result, error, blankColumns = [], decision, dataset, locale } = options;
 
   return streamText({
     model,
@@ -262,7 +276,7 @@ export function answerData(options: {
 ${text}
 
 Resultado de la consulta:
-${describeResult(result, error)}${describeProjection(decision)}`,
+${describeResult(result, error)}${describeBlankColumns(blankColumns)}${describeProjection(decision)}`,
   });
 }
 
@@ -339,6 +353,8 @@ export async function generateTitle(options: {
 /** Contract caps, enforced here because the model is asked, not trusted. */
 const DESCRIPTION_LIMIT = 1_000;
 const EXTRA_CONTEXT_LIMIT = 8_000;
+/** A starter is a button label, so it has to stay on one line. */
+const STARTER_LIMIT = 120;
 
 /**
  * Documents a model from its own catalogue: what it measures, what its cryptic
@@ -376,5 +392,6 @@ Documenta el modelo.`
   return {
     description: output.description.trim().slice(0, DESCRIPTION_LIMIT),
     extraContext: output.extraContext.trim().slice(0, EXTRA_CONTEXT_LIMIT),
+    starters: output.starters.map((starter) => starter.trim().slice(0, STARTER_LIMIT)),
   };
 }

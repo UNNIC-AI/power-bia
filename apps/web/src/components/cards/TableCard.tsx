@@ -1,8 +1,8 @@
 import type { Locale, TableCard as TableCardType } from '@powerbia/contracts';
 import { IconCheck, IconChevronLeft, IconChevronRight, IconMinus } from '@tabler/icons-react';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { formatCell } from '../../lib/format.ts';
+import { formatCell, fractionDigitsFor } from '../../lib/format.ts';
 import { Tooltip } from '../Tooltip.tsx';
 
 const PAGE_SIZE = 25;
@@ -23,6 +23,18 @@ export function TableCard({ card, locale }: { card: TableCardType; locale: Local
   const pages = Math.max(1, Math.ceil(card.rows.length / PAGE_SIZE));
   const current = Math.min(page, pages - 1);
   const visible = card.rows.slice(current * PAGE_SIZE, current * PAGE_SIZE + PAGE_SIZE);
+
+  /*
+   * Read from every row, not just the visible page: paging must not change how
+   * a column is formatted.
+   */
+  const digits = useMemo(
+    () =>
+      card.columns.map((_column, index) =>
+        fractionDigitsFor(card.rows.map((row) => row[index] ?? null)),
+      ),
+    [card.columns, card.rows],
+  );
 
   if (card.rows.length === 0) {
     return <p className="text-base-content/60 p-4 text-sm">{t('table.noRows')}</p>;
@@ -51,7 +63,7 @@ export function TableCard({ card, locale }: { card: TableCardType; locale: Local
                     {typeof cell === 'boolean' ? (
                       <BooleanCell value={cell} label={t(cell ? 'table.yes' : 'table.no')} />
                     ) : (
-                      formatCell(cell, locale)
+                      formatCell(cell, locale, digits[cellIndex])
                     )}
                   </td>
                 ))}

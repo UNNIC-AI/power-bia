@@ -1,4 +1,4 @@
-import type { VizDecision } from '@powerbia/contracts';
+import type { Card, VizDecision } from '@powerbia/contracts';
 import { describe, expect, it } from 'vitest';
 import { buildCard, type CardContext } from './build.js';
 import { MAX_CATEGORIES, MAX_SERIES, MAX_TEMPORAL_POINTS } from './reduce.js';
@@ -238,5 +238,75 @@ describe('buildCard', () => {
       expect(labels[0]).toBe('2012/010');
       expect(labels.at(-1)).toBe(`2012/${String(total - 1).padStart(3, '0')}`);
     });
+  });
+});
+
+describe('canonical value order', () => {
+  const labelsOf = (card: Card | null) =>
+    (card as { series: { data: { label: string }[] }[] }).series[0]?.data.map(
+      (point) => point.label,
+    );
+
+  const months = ['enero', 'febrero', 'marzo', 'abril'];
+  const ordered: CardContext = {
+    ...ctx,
+    orderFor: (column) => (column === 'Mes' ? months : null),
+  };
+
+  /*
+   * The generated DAX orders by the month *name*, because ordering by the month
+   * number would mean projecting it. Alphabetical is what comes back.
+   */
+  const alphabetical: ResultTable = {
+    columns: ['Mes', 'Kilos'],
+    rows: [
+      ['abril', 4],
+      ['enero', 1],
+      ['febrero', 2],
+      ['marzo', 3],
+    ],
+  };
+
+  it('puts a line chart back in calendar order', () => {
+    const card = buildCard(alphabetical, decide({ chartType: 'line', xAxis: 'Mes' }), ordered);
+
+    expect(card).toMatchObject({
+      kind: 'line',
+      series: [{ data: months.map((label, index) => ({ label, value: index + 1 })) }],
+    });
+  });
+
+  it('orders a bar chart by the axis, not by value', () => {
+    const card = buildCard(alphabetical, decide({ chartType: 'bar', xAxis: 'Mes' }), ordered);
+
+    expect(labelsOf(card)).toEqual(months);
+  });
+
+  it('orders a table the same way', () => {
+    const card = buildCard(alphabetical, decide({ mode: 'table', xAxis: 'Mes' }), ordered);
+
+    expect((card as { rows: unknown[][] }).rows.map((row) => row[0])).toEqual(months);
+  });
+
+  it('leaves the rows alone when the column has no canonical order', () => {
+    const card = buildCard(alphabetical, decide({ chartType: 'bar', xAxis: 'Mes' }), ctx);
+
+    expect(labelsOf(card)).toEqual(['abril', 'enero', 'febrero', 'marzo']);
+  });
+
+  /** A value outside the known order must be shown, not dropped. */
+  it('keeps an unknown label, after the ones it knows', () => {
+    const withExtra: ResultTable = {
+      columns: ['Mes', 'Kilos'],
+      rows: [
+        ['sin fecha', 9],
+        ['marzo', 3],
+        ['enero', 1],
+      ],
+    };
+
+    const card = buildCard(withExtra, decide({ chartType: 'bar', xAxis: 'Mes' }), ordered);
+
+    expect(labelsOf(card)).toEqual(['enero', 'marzo', 'sin fecha']);
   });
 });

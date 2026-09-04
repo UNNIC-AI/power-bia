@@ -1,0 +1,1 @@
+ALTER TABLE "datasets" ADD COLUMN "starters" jsonb DEFAULT '[]'::jsonb NOT NULL;

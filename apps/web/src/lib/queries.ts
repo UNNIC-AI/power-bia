@@ -290,9 +290,35 @@ export function useAddWidget(dashboardId: string) {
       card: Card;
       query: string | null;
       dax: string | null;
-      layout: WidgetLayout;
+      /** Omit to let the server append below the last widget. */
+      layout?: WidgetLayout;
     }) => api.post<Widget>(`/dashboards/${dashboardId}/widgets`, body),
     onSuccess: () => {
+      void client.invalidateQueries({ queryKey: keys.dashboard(dashboardId) });
+      void client.invalidateQueries({ queryKey: keys.dashboards });
+    },
+  });
+}
+
+/**
+ * `useAddWidget` binds its dashboard when the hook runs, which the chat cannot
+ * do: the target is whichever view the reader picks from the pin menu. The
+ * layout is left to the server, which appends below what is already there.
+ */
+export function usePinToDashboard() {
+  const client = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      dashboardId,
+      ...body
+    }: {
+      dashboardId: string;
+      card: Card;
+      query: string | null;
+      dax: string | null;
+    }) => api.post<Widget>(`/dashboards/${dashboardId}/widgets`, body),
+    onSuccess: (_widget, { dashboardId }) => {
       void client.invalidateQueries({ queryKey: keys.dashboard(dashboardId) });
       void client.invalidateQueries({ queryKey: keys.dashboards });
     },

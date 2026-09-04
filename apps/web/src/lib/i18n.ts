@@ -49,14 +49,21 @@ export const resources = {
         showDax: 'Ver DAX',
         hideDax: 'Ocultar DAX',
         pinToDashboard: 'Fijar a una vista',
+        pinnedTo: 'Fijado a «{{name}}».',
+        pinFailed: 'No se ha podido fijar el gráfico.',
         send: 'Enviar',
         confirmDeleteTitle: '¿Eliminar esta consulta?',
         confirmDeleteBody:
           'Se eliminará «{{title}}» y todos sus mensajes. Esta acción no se puede deshacer.',
+        /*
+         * Only shown until the model has been synced: the real suggestions are
+         * written from its own catalogue and arrive with `/api/dataset`. These
+         * name no metric on purpose, so they are wrong on no model.
+         */
         starters: [
-          '¿Cuáles fueron las ventas totales en 2021?',
-          'Muéstrame la evolución de ventas de 2012 a 2021',
-          'Top 10 categorías por ventas en 2021',
+          '¿Cuál es el total del periodo disponible?',
+          'Muéstrame la evolución mes a mes',
+          '¿Qué categorías destacan sobre el resto?',
         ],
       },
       dashboards: {
@@ -214,14 +221,16 @@ export const resources = {
         showDax: 'Show DAX',
         hideDax: 'Hide DAX',
         pinToDashboard: 'Pin to a view',
+        pinnedTo: 'Pinned to "{{name}}".',
+        pinFailed: 'The chart could not be pinned.',
         send: 'Send',
         confirmDeleteTitle: 'Delete this query?',
         confirmDeleteBody:
           '“{{title}}” and all of its messages will be deleted. This cannot be undone.',
         starters: [
-          'What were total sales in 2021?',
-          'Show me the sales trend from 2012 to 2021',
-          'Top 10 categories by sales in 2021',
+          'What is the total for the available period?',
+          'Show me the month-by-month trend',
+          'Which categories stand out from the rest?',
         ],
       },
       dashboards: {
