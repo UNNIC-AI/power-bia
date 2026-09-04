@@ -18,8 +18,8 @@ workspace packages. The API image copies manifests before sources so
 `pnpm install` is cached across code edits, and no secret is ever a build
 argument — they all arrive as runtime environment.
 
-CI builds all three on every push, so a broken Dockerfile fails before a deploy
-does.
+Nothing builds them automatically. `docker compose build` is the only thing that
+catches a broken Dockerfile, so run it before a deploy rather than during one.
 
 ## Topology
 

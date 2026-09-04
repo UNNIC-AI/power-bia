@@ -14,7 +14,7 @@ at the bottom and are not implemented.
 | Node | **24** (`.nvmrc`) | AI SDK 7 is ESM-only and needs Node 22+; 24 is the current LTS line |
 | pnpm | **11.20.0** (`packageManager`) | Workspaces plus the `catalog:` protocol |
 | .NET SDK | **10** | `services/dax-gateway` targets `net10.0`, the TFM the MVP's ADOMD wrapper was built against |
-| Postgres | **17** | Pinned in compose, in CI and here. `jsonb`, enums and cascading FKs are all used |
+| Postgres | **17** | Pinned in compose and here. `jsonb`, enums and cascading FKs are all used |
 | Docker | any with `docker compose` v2 | Postgres, the gateway, and the images |
 | Nix | with flakes enabled | Optional. Provides all of the above |
 

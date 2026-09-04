@@ -265,8 +265,8 @@ The deployable artifacts are the Docker images. A `buildNpmPackage` of a pnpm
 workspace would be a second, divergent build of the same thing, with an
 `npmDepsHash` to re-paste on every lockfile edit. `nix flake check` runs what Nix
 can check hermetically — the Nix formatting and shellcheck — and the JavaScript
-lint, typecheck and tests stay in CI where pnpm has already installed
-`node_modules`.
+lint, typecheck and tests stay in the pnpm scripts, where `node_modules` is
+already installed.
 
 ### The database-backed tests refuse to skip in CI
 

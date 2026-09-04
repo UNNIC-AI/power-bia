@@ -163,9 +163,9 @@ decision can be satisfied by columns already present — is not implemented. Tod
 `runtime` targets; `docker-compose.yml` runs every service behind a profile, and
 `docker-compose.prod.yml` is the production shape (runtime targets, no bind
 mounts, resource limits, secrets required rather than defaulted, the gateway
-unpublished, nginx serving the SPA and proxying `/api`). CI builds all three
-images. `/healthz` and `/readyz` exist. Backups, restore and rollback are written
-down in [deployment.md](./deployment.md).
+unpublished, nginx serving the SPA and proxying `/api`). `/healthz` and `/readyz`
+exist. Backups, restore and rollback are written down in
+[deployment.md](./deployment.md).
 
 What is left here: nothing blocking, but nobody has restored a dump into a clean
 environment yet, and the restore command in `deployment.md` should be exercised
@@ -176,8 +176,8 @@ once before it is trusted.
 The scaffolding is in place on both sides: 72 in the API and 8 in the web app.
 Route tests go through `buildApp()` and `app.inject()` against a real Postgres
 (a throwaway database per vitest worker); component tests go through the DOM with
-Testing Library, `user-event` and MSW. CI runs both with a Postgres service and
-the suites refuse to skip there.
+Testing Library, `user-event` and MSW. Both run from `pnpm test`; exporting
+`CI=true` is what makes the database-backed suites fail rather than skip.
 
 Still missing, in value order:
 
@@ -192,8 +192,8 @@ Still missing, in value order:
 - Component tests for the chat panel and the dashboard canvas.
 - One Playwright path against the compose stack: sign in, ask a question, pin the
   card. The money path, and the only test that would cover the streaming contract.
-- CI runs `dotnet test` in `services/dax-gateway` and **there are no .NET tests**,
-  so that step is decorative.
+- There are **no .NET tests** in `services/dax-gateway`; `dotnet test` there
+  passes because it has nothing to run.
 
 ### 10. Hardening
 
